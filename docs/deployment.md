@@ -629,6 +629,13 @@ daemon. Nothing else has to change, and every repository stack with relative
 bind mounts starts working, not just this one. Existing Portainer data is
 untouched: it is the same directory, mounted somewhere else.
 
+Mount the parent instead -- `-v /home/docker:/home/docker` -- if you also want
+Portainer to manage stacks kept elsewhere under it, rather than only under its
+own data directory. That is the only reason to widen it: the bind mounts
+themselves are resolved by the daemon, which reads the host filesystem
+directly and needs nothing mounted into Portainer. Widening grants Portainer no
+authority it lacks either way, since it already has the Docker socket.
+
 **Or let Portainer rewrite the paths.** Recent versions offer relative path
 volume support when creating the stack, where you give it the host path the
 repository lives at. Same result, configured per stack instead of once.
