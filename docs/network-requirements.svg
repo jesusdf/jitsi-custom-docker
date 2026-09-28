@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="740" viewBox="0 0 1000 740" font-family="Helvetica, Arial, sans-serif">
+  <title>Jitsi Meet server - network requirements</title>
+  <desc>Inbound and outbound firewall requirements for a Jitsi Meet video conferencing server.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#5a6472"/>
+    </marker>
+    <marker id="arrowOut" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8d9199"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="740" fill="#ffffff"/>
+
+  <!-- ── Header ────────────────────────────────────────────────────────── -->
+  <text x="40" y="52" font-size="25" font-weight="600" fill="#1c2430">Jitsi Meet server — network requirements</text>
+  <text x="40" y="78" font-size="14" fill="#5a6472">Ports that must reach the server for video conferencing to work.</text>
+  <line x1="40" y1="96" x2="960" y2="96" stroke="#dfe3e8" stroke-width="1"/>
+
+  <!-- ── Participants ──────────────────────────────────────────────────── -->
+  <rect x="40" y="130" width="190" height="330" rx="8" fill="#f4f6f8" stroke="#c9d0d8" stroke-width="1.5"/>
+  <text x="135" y="160" font-size="16" font-weight="600" fill="#1c2430" text-anchor="middle">Participants</text>
+  <text x="135" y="182" font-size="12.5" fill="#5a6472" text-anchor="middle">Browser or mobile app</text>
+  <text x="135" y="199" font-size="12.5" fill="#5a6472" text-anchor="middle">on any network</text>
+
+  <rect x="62" y="228" width="146" height="70" rx="6" fill="#ffffff" stroke="#c9d0d8"/>
+  <text x="135" y="251" font-size="12.5" font-weight="600" fill="#1c2430" text-anchor="middle">Normal network</text>
+  <text x="135" y="270" font-size="11.5" fill="#5a6472" text-anchor="middle">Media goes direct</text>
+  <text x="135" y="286" font-size="11.5" fill="#5a6472" text-anchor="middle">over UDP 10000</text>
+
+  <rect x="62" y="316" width="146" height="86" rx="6" fill="#ffffff" stroke="#c9d0d8"/>
+  <text x="135" y="339" font-size="12.5" font-weight="600" fill="#1c2430" text-anchor="middle">Restricted network</text>
+  <text x="135" y="358" font-size="11.5" fill="#5a6472" text-anchor="middle">Only 443 allowed out.</text>
+  <text x="135" y="374" font-size="11.5" fill="#5a6472" text-anchor="middle">Media is relayed</text>
+  <text x="135" y="390" font-size="11.5" fill="#5a6472" text-anchor="middle">through port 443.</text>
+
+  <text x="135" y="432" font-size="11.5" fill="#8d9199" text-anchor="middle">No inbound access to the</text>
+  <text x="135" y="447" font-size="11.5" fill="#8d9199" text-anchor="middle">participant is ever needed.</text>
+
+  <!-- ── Connection arrows ─────────────────────────────────────────────── -->
+  <line x1="230" y1="212" x2="404" y2="212" stroke="#5a6472" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <rect x="234" y="192" width="158" height="20" rx="4" fill="#ffffff"/>
+  <text x="240" y="207" font-size="12.5" font-weight="600" fill="#1c2430">TCP 80</text>
+  <text x="300" y="207" font-size="11.5" fill="#5a6472">certificates</text>
+
+  <line x1="230" y1="263" x2="404" y2="263" stroke="#5a6472" stroke-width="2.4" marker-end="url(#arrow)"/>
+  <rect x="234" y="243" width="158" height="20" rx="4" fill="#ffffff"/>
+  <text x="240" y="258" font-size="12.5" font-weight="600" fill="#1c2430">TCP 443</text>
+  <text x="306" y="258" font-size="11.5" fill="#5a6472">web + relay</text>
+
+  <line x1="230" y1="314" x2="404" y2="314" stroke="#5a6472" stroke-width="2.4" marker-end="url(#arrow)"/>
+  <rect x="234" y="294" width="158" height="20" rx="4" fill="#ffffff"/>
+  <text x="240" y="309" font-size="12.5" font-weight="600" fill="#1c2430">UDP 443</text>
+  <text x="306" y="309" font-size="11.5" fill="#5a6472">relay (best)</text>
+
+  <line x1="230" y1="365" x2="404" y2="365" stroke="#5a6472" stroke-width="2.4" marker-end="url(#arrow)"/>
+  <rect x="234" y="345" width="162" height="20" rx="4" fill="#ffffff"/>
+  <text x="240" y="360" font-size="12.5" font-weight="600" fill="#1c2430">UDP 10000</text>
+  <text x="322" y="360" font-size="11.5" fill="#5a6472">direct media</text>
+
+  <!-- ── Server ────────────────────────────────────────────────────────── -->
+  <rect x="410" y="130" width="330" height="330" rx="8" fill="#f4f6f8" stroke="#8a94a2" stroke-width="2"/>
+  <text x="575" y="160" font-size="16" font-weight="600" fill="#1c2430" text-anchor="middle">Conferencing server</text>
+  <text x="575" y="180" font-size="12" fill="#5a6472" text-anchor="middle">One host. All services run in containers.</text>
+
+  <rect x="432" y="200" width="286" height="54" rx="6" fill="#ffffff" stroke="#c9d0d8"/>
+  <text x="448" y="222" font-size="13" font-weight="600" fill="#1c2430">Web front end</text>
+  <text x="448" y="241" font-size="11.5" fill="#5a6472">Serves the meeting page and signalling.</text>
+
+  <rect x="432" y="264" width="286" height="70" rx="6" fill="#ffffff" stroke="#c9d0d8"/>
+  <text x="448" y="286" font-size="13" font-weight="600" fill="#1c2430">Relay server</text>
+  <text x="448" y="305" font-size="11.5" fill="#5a6472">Carries media for participants whose</text>
+  <text x="448" y="321" font-size="11.5" fill="#5a6472">network blocks everything but 443.</text>
+
+  <rect x="432" y="344" width="286" height="70" rx="6" fill="#ffffff" stroke="#c9d0d8"/>
+  <text x="448" y="366" font-size="13" font-weight="600" fill="#1c2430">Media server</text>
+  <text x="448" y="385" font-size="11.5" fill="#5a6472">Receives each participant's audio and</text>
+  <text x="448" y="401" font-size="11.5" fill="#5a6472">video and forwards it to the others.</text>
+
+  <text x="575" y="440" font-size="11.5" fill="#8d9199" text-anchor="middle">Ports 443/TCP and 443/UDP are shared by the web</text>
+  <text x="575" y="454" font-size="11.5" fill="#8d9199" text-anchor="middle">front end and the relay. No extra ports are needed.</text>
+
+  <!-- ── Outbound ──────────────────────────────────────────────────────── -->
+  <line x1="740" y1="240" x2="828" y2="240" stroke="#8d9199" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arrowOut)"/>
+  <line x1="740" y1="330" x2="828" y2="330" stroke="#8d9199" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arrowOut)"/>
+
+  <rect x="830" y="130" width="130" height="330" rx="8" fill="#fafbfc" stroke="#dfe3e8" stroke-width="1.5"/>
+  <text x="895" y="160" font-size="14" font-weight="600" fill="#1c2430" text-anchor="middle">Outbound</text>
+  <text x="895" y="178" font-size="11.5" fill="#8d9199" text-anchor="middle">from the server</text>
+
+  <rect x="846" y="200" width="98" height="80" rx="6" fill="#ffffff" stroke="#dfe3e8"/>
+  <text x="895" y="222" font-size="12" font-weight="600" fill="#1c2430" text-anchor="middle">TCP 443</text>
+  <text x="895" y="240" font-size="11" fill="#5a6472" text-anchor="middle">Certificate</text>
+  <text x="895" y="255" font-size="11" fill="#5a6472" text-anchor="middle">renewal</text>
+  <text x="895" y="270" font-size="11" fill="#8d9199" text-anchor="middle">(optional)</text>
+
+  <rect x="846" y="296" width="98" height="68" rx="6" fill="#ffffff" stroke="#dfe3e8"/>
+  <text x="895" y="318" font-size="12" font-weight="600" fill="#1c2430" text-anchor="middle">UDP 53</text>
+  <text x="895" y="336" font-size="11" fill="#5a6472" text-anchor="middle">DNS</text>
+  <text x="895" y="352" font-size="11" fill="#5a6472" text-anchor="middle">resolution</text>
+
+  <!-- ── Firewall table ────────────────────────────────────────────────── -->
+  <line x1="40" y1="494" x2="960" y2="494" stroke="#dfe3e8" stroke-width="1"/>
+  <text x="40" y="522" font-size="16" font-weight="600" fill="#1c2430">Inbound rules required</text>
+
+  <rect x="40" y="538" width="920" height="28" fill="#f4f6f8"/>
+  <text x="56" y="557" font-size="12" font-weight="600" fill="#5a6472">PORT</text>
+  <text x="150" y="557" font-size="12" font-weight="600" fill="#5a6472">PROTOCOL</text>
+  <text x="256" y="557" font-size="12" font-weight="600" fill="#5a6472">SOURCE</text>
+  <text x="380" y="557" font-size="12" font-weight="600" fill="#5a6472">PURPOSE</text>
+  <text x="820" y="557" font-size="12" font-weight="600" fill="#5a6472">REQUIRED</text>
+
+  <text x="56" y="586" font-size="13" fill="#1c2430">80</text>
+  <text x="150" y="586" font-size="13" fill="#1c2430">TCP</text>
+  <text x="256" y="586" font-size="13" fill="#1c2430">Any</text>
+  <text x="380" y="586" font-size="13" fill="#1c2430">Certificate validation; redirects users to HTTPS</text>
+  <text x="820" y="586" font-size="13" fill="#1c2430">Yes</text>
+  <line x1="40" y1="596" x2="960" y2="596" stroke="#eef1f4"/>
+
+  <text x="56" y="615" font-size="13" fill="#1c2430">443</text>
+  <text x="150" y="615" font-size="13" fill="#1c2430">TCP</text>
+  <text x="256" y="615" font-size="13" fill="#1c2430">Any</text>
+  <text x="380" y="615" font-size="13" fill="#1c2430">Meeting page, signalling, and media relay fallback</text>
+  <text x="820" y="615" font-size="13" fill="#1c2430">Yes</text>
+  <line x1="40" y1="625" x2="960" y2="625" stroke="#eef1f4"/>
+
+  <text x="56" y="644" font-size="13" fill="#1c2430">443</text>
+  <text x="150" y="644" font-size="13" fill="#1c2430">UDP</text>
+  <text x="256" y="644" font-size="13" fill="#1c2430">Any</text>
+  <text x="380" y="644" font-size="13" fill="#1c2430">Media relay. Better call quality than the TCP path</text>
+  <text x="820" y="644" font-size="13" fill="#1c2430">Yes</text>
+  <line x1="40" y1="654" x2="960" y2="654" stroke="#eef1f4"/>
+
+  <text x="56" y="673" font-size="13" fill="#1c2430">10000</text>
+  <text x="150" y="673" font-size="13" fill="#1c2430">UDP</text>
+  <text x="256" y="673" font-size="13" fill="#1c2430">Any</text>
+  <text x="380" y="673" font-size="13" fill="#1c2430">Direct media. Avoids the relay when the network allows it</text>
+  <text x="820" y="673" font-size="13" fill="#1c2430">Yes</text>
+  <line x1="40" y1="683" x2="960" y2="683" stroke="#eef1f4"/>
+
+  <text x="40" y="704" font-size="11.5" fill="#8d9199">No other inbound port is needed. In particular, the relay's internal port range does not have to be opened: those</text>
+  <text x="40" y="719" font-size="11.5" fill="#8d9199">ports face the media server inside the host, never the participant.</text>
+</svg>
