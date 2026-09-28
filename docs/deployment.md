@@ -560,7 +560,123 @@ To roll back, put the old tag back and run the same two commands.
 
 ---
 
-## Chapter 7. When It Does Not Work
+## Chapter 7. Deploying from Portainer
+
+Portainer is the intended way to run this stack. Use **Stacks -> Add stack ->
+Repository** and point it at the Git repository: the repository carries the
+compose file *and* `conf/`, which the containers bind-mount, so the web editor
+and file upload options are not enough on their own.
+
+Two things about repository stacks catch people out. Both are dealt with below.
+
+### 7.1 Create the stack
+
+1. **Stacks -> Add stack**, give it a name, choose **Repository**.
+2. Repository URL, reference (`refs/heads/main`) and, for a private
+   repository, credentials.
+3. Compose path: `docker-compose.yml`.
+4. Under **Environment variables**, add the contents of `.env.example` with
+   your values. Portainer writes these to an `.env` file next to the compose
+   file, which is where the stack reads them from.
+5. Deploy.
+
+Optionally enable **GitOps updates** so Portainer re-pulls on a schedule or
+from a webhook. Your own files under `conf/` are gitignored, so a pull never
+overwrites them.
+
+### 7.2 The first catch: bind mounts and where the daemon looks
+
+The compose file mounts `conf/` into several containers. Compose turns a
+relative path into an absolute one using the directory the compose file is in,
+and hands that to the Docker daemon, which resolves it **on the host**.
+
+For a repository stack, Portainer clones into its own `/data/compose/<id>`. If
+Portainer's `/data` is a named volume, that path does not exist on the host,
+and the daemon silently creates empty directories instead. The symptom is
+nginx failing to start with configuration it cannot find.
+
+Two ways to avoid it:
+
+**Tell Portainer where the repository lives on the host.** Recent Portainer
+versions offer a local filesystem path for relative volumes when creating the
+stack. Set it, and `conf/` resolves correctly with no other change. This is the
+better option because Git stays the source of truth.
+
+**Or point the stack at an absolute path.** Works on any Portainer version:
+
+```sh
+# On the host, once
+git clone <repository-url> /opt/jitsi
+```
+
+Then set, in the stack's environment variables:
+
+```dotenv
+STACK_DIR=/opt/jitsi
+CONFIG=/opt/jitsi/data
+```
+
+The trade-off is that `/opt/jitsi` is now updated with `git pull` rather than
+by Portainer.
+
+To check which situation you are in, deploy and look at the init container:
+
+```sh
+docker compose logs init
+```
+
+If it reports missing files or nginx cannot find its configuration, the mounts
+did not resolve.
+
+### 7.3 The second catch: the environment file
+
+`.env` is gitignored -- it holds secrets -- so a fresh clone does not have one.
+Compose refuses to start a service whose `env_file` is missing, which would
+make a repository stack fail before anything ran.
+
+The compose file therefore marks it `required: false`, and the init container
+checks the variables that actually matter instead:
+
+```
+[init] the environment is missing: JITSI_VERSION JITSI_DOMAINS PUBLIC_URL STACK_SUBNET
+[init] ERROR: set them in .env, or in the stack's environment variables, and deploy again
+```
+
+Init exits non-zero, so nothing else starts on a half-configured stack.
+
+In normal use this never appears: Portainer writes the `.env` file from the
+variables you entered in step 4.
+
+### 7.4 Files Portainer does not carry
+
+Anything gitignored has to be placed on the host once, under whatever directory
+`STACK_DIR` names:
+
+| Path | What |
+|---|---|
+| `conf/certs/` | Certificate and key, when `TLS_MODE=files`. Any extra CA |
+| `conf/routes.conf` | Sub-path routes. Copy from `conf/routes.conf.example` |
+| `conf/nginx/sites/` | Site files for anything that is not Jitsi |
+| `conf/branding/` | Logo, background, dynamic branding JSON |
+
+`conf/prosody/plugins/` fills itself: the init container downloads into it.
+
+### 7.5 Updating
+
+| To change | Do this |
+|---|---|
+| A setting | Edit the stack's environment variables, redeploy |
+| The Jitsi version | Change `JITSI_VERSION`, redeploy with **Re-pull image** |
+| Routes or site files | Edit them under `STACK_DIR`, then restart `nginx` |
+| The stack itself | **Pull and redeploy**, or let GitOps do it |
+
+> **Keep a way into Portainer that does not pass through this stack.** If its
+> vhost is served here and nginx fails to start, the console you would use to
+> fix it goes down with it. See section 5.3.
+
+---
+
+## Chapter 8. When It Does Not Work
 
 ### The stack will not start
 

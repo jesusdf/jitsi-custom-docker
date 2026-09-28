@@ -193,7 +193,27 @@ render_coturn_config() {
 
 # -----------------------------------------------------------------------------
 
+# A stack deployed from Git has no .env until the operator supplies one, so
+# the first failure has to name what is missing rather than surface as an
+# image called "jitsi/web:" that cannot be pulled.
+REQUIRED_VARIABLES='JITSI_VERSION JITSI_DOMAINS PUBLIC_URL STACK_SUBNET'
+
+check_required_variables() {
+    missing=''
+    for name in $REQUIRED_VARIABLES; do
+        eval "value=\${$name:-}"
+        [ -n "$value" ] || missing="$missing $name"
+    done
+
+    [ -z "$missing" ] && return 0
+
+    log "the environment is missing:$missing"
+    die "set them in .env, or in the stack's environment variables, and deploy again"
+}
+
+
 main() {
+    check_required_variables
     create_data_directories
     build_ca_bundle
     download_plugins
