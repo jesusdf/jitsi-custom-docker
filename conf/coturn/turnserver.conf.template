@@ -1,0 +1,60 @@
+# coturn -- rendered by conf/scripts/init.sh
+#
+# Reachable two ways, both on port 443:
+#   * 443/udp  directly, for STUN and TURN over UDP
+#   * 443/tcp  through nginx, which routes TLS connections whose ALPN is
+#              "stun.turn" here on port 5349
+#
+# The relay port range faces the video bridge, never the client, so it does not
+# need to be reachable from the internet.
+
+listening-port=443
+tls-listening-port=5349
+
+min-port=@TURN_RELAY_MIN_PORT@
+max-port=@TURN_RELAY_MAX_PORT@
+
+realm=@TURN_HOST@
+server-name=@TURN_HOST@
+@TURN_EXTERNAL_IP_LINE@
+
+# Prosody derives time-limited credentials from this secret, so no static
+# password is ever handed to a client.
+use-auth-secret
+static-auth-secret=@TURN_CREDENTIALS@
+
+cert=@TLS_CERT_FILE@
+pkey=@TLS_KEY_FILE@
+
+cipher-list="ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384"
+no-tlsv1
+no-tlsv1_1
+
+# A TURN server on a well-known port is a standing invitation to relay abuse.
+# Everything below narrows what it will relay and to whom.
+no-multicast-peers
+no-tcp-relay
+no-cli
+no-software-attribute
+
+denied-peer-ip=0.0.0.0-0.255.255.255
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=100.64.0.0-100.127.255.255
+denied-peer-ip=127.0.0.0-127.255.255.255
+denied-peer-ip=169.254.0.0-169.254.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+denied-peer-ip=192.0.0.0-192.0.0.255
+denied-peer-ip=192.88.99.0-192.88.99.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+denied-peer-ip=198.18.0.0-198.19.255.255
+denied-peer-ip=198.51.100.0-198.51.100.255
+denied-peer-ip=203.0.113.0-203.0.113.255
+denied-peer-ip=240.0.0.0-255.255.255.255
+
+# The video bridge lives on the stack's own network, which the rules above
+# deny. Allow back exactly that subnet -- and nothing else private -- so
+# relayed media reaches the bridge without opening a path to the rest of the
+# host's networks.
+allowed-peer-ip=@TURN_ALLOWED_PEER_RANGE@
+
+syslog

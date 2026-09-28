@@ -1,0 +1,13 @@
+private/
+
+# Live configuration. Only the *.example counterparts are versioned.
+.env
+/data/
+/conf/routes.conf
+/conf/certs/*
+!/conf/certs/.gitkeep
+/conf/branding/*
+!/conf/branding/.gitkeep
+/conf/nginx/sites/*.conf
+/conf/prosody/plugins/*
+!/conf/prosody/plugins/.gitkeep
