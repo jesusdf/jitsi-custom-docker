@@ -68,17 +68,110 @@ docs/
 `conf/` holds the live configuration and is not versioned beyond the templates
 and `.example` files.
 
-## Ports
+## Topology
 
-| Port | Protocol | Purpose |
+### What arrives from outside
+
+```mermaid
+flowchart LR
+    client(["Client"])
+
+    client -- "80/tcp" --> p80
+    client -- "443/tcp" --> split
+    client -- "443/udp" --> coturn["coturn<br/>STUN and TURN over UDP"]
+    client -- "10000/udp" --> jvb["jvb<br/>direct media"]
+    client -. "20000-20050/udp<br/>optional" .-> jigasi["jigasi<br/>SIP media"]
+
+    subgraph nginx ["nginx"]
+        p80["port 80<br/>ACME challenge<br/>301 to HTTPS"]
+        split{"port 443<br/>ssl_preread<br/>split by ALPN"}
+        https["port 8443<br/>HTTPS listener<br/>PROXY protocol"]
+    end
+
+    split -- "ALPN = stun.turn" --> turns["coturn:5349<br/>TURN over TLS"]
+    split -- "anything else" --> https
+
+    https --> web["web:80<br/>frontend and signalling"]
+    https --> colibri["jvb:9090<br/>colibri WebSocket"]
+    https --> routes["routes.conf targets<br/>other hosts, or the Docker host"]
+```
+
+Only four ports need to be open inbound. The TURN relay range
+(`TURN_RELAY_MIN_PORT`..`TURN_RELAY_MAX_PORT`) does **not**: those ports face
+the video bridge inside the stack, never the client.
+
+| Port | Protocol | Container | Carries |
+|---|---|---|---|
+| 80 | TCP | nginx | ACME challenges; everything else redirects to HTTPS |
+| 443 | TCP | nginx | HTTPS *and* TURN over TLS, separated by ALPN |
+| 443 | UDP | coturn | STUN, and TURN over UDP |
+| 10000 | UDP | jvb | Direct media, used whenever the client's network allows it |
+| 20000-20050 | UDP | jigasi | SIP media. Only when the `jigasi` profile is on |
+
+For a version you can hand to a client's IT department, see
+[docs/network-requirements.svg](docs/network-requirements.svg).
+
+### What happens inside
+
+```mermaid
+flowchart LR
+    nginx["nginx"] -- "BOSH and XMPP WebSocket" --> web["web:80"]
+    web --> prosody["prosody:5280"]
+    nginx -- "colibri WebSocket" --> jvbws["jvb:9090"]
+
+    jicofo["jicofo"] -- "5222" --> prosody
+    jvb["jvb"] -- "5222" --> prosody
+    jigasi["jigasi<br/>optional"] -. "5222" .-> prosody
+```
+
+nginx never talks to Prosody directly: signalling goes through the web
+container, which is what upstream expects.
+
+### Networks
+
+```mermaid
+flowchart TB
+    subgraph edge ["jitsi-edge - shared with other stacks"]
+        nginx_e["nginx"]
+        others["containers from other stacks<br/>publish no port on the host"]
+        nginx_e <--> others
+    end
+
+    subgraph meet ["meet.jitsi - 172.31.250.0/24, pinned"]
+        nginx_m["nginx"]
+        coturn["coturn"]
+        web["web"]
+        prosody["prosody"]
+        jicofo["jicofo"]
+        jvb["jvb"]
+        jigasi["jigasi<br/>optional"]
+        init["init"]
+        acme["acme"]
+    end
+
+    nginx_e -.- nginx_m
+```
+
+nginx is the only service on both networks, so it appears twice above.
+
+| Network | Members | Why |
 |---|---|---|
-| 80 | TCP | ACME challenges, redirect to HTTPS |
-| 443 | TCP | HTTPS and TURN over TLS, separated by ALPN |
-| 443 | UDP | STUN and TURN over UDP |
-| 10000 | UDP | Direct media to the video bridge |
+| `meet.jitsi` | every service | The stack's own private network. Its subnet is pinned because coturn's peer allow-list has to name it exactly |
+| `jitsi-edge` | `nginx`, plus containers from other stacks | Lets nginx proxy to other stacks without any of them publishing a port on the host. Created by this stack; the others join it as external |
 
-The TURN relay range faces the video bridge, not the client, so it does not
-need to be reachable from the internet.
+### Services
+
+| Service | Role | Runs |
+|---|---|---|
+| `init` | Renders the generated files, then exits | once, before the rest |
+| `nginx` | Reverse proxy, TLS termination, 443 splitter | always |
+| `coturn` | STUN and TURN | always |
+| `web` | Jitsi Meet frontend | always |
+| `prosody` | XMPP server; hosts the plugins | always |
+| `jicofo` | Conference focus: decides | always |
+| `jvb` | Video bridge: transports | always |
+| `jigasi` | SIP gateway and transcription | `COMPOSE_PROFILES=jigasi` |
+| `acme` | Certificate issuance and renewal | only when `TLS_MODE=acme-*` |
 
 ## Documentation
 

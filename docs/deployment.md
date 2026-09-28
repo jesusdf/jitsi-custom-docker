@@ -42,6 +42,10 @@ The TURN relay range (`TURN_RELAY_MIN_PORT`..`TURN_RELAY_MAX_PORT`) does
 **not** need to be open. Those ports face the video bridge inside the stack's
 own network, never the client.
 
+[network-requirements.svg](network-requirements.svg) says the same thing in a
+form you can send to whoever runs the firewall, without mentioning Jitsi
+internals.
+
 ---
 
 ## Chapter 2. A First Deployment
