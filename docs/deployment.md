@@ -595,38 +595,69 @@ Portainer's `/data` is a named volume, that path does not exist on the host,
 and the daemon silently creates empty directories instead. The symptom is
 nginx failing to start with configuration it cannot find.
 
-Two ways to avoid it:
+The mismatch is worth being precise about, because it is not obvious. Say
+Portainer runs like this:
 
-**Tell Portainer where the repository lives on the host.** Recent Portainer
-versions offer a local filesystem path for relative volumes when creating the
-stack. Set it, and `conf/` resolves correctly with no other change. This is the
-better option because Git stays the source of truth.
+```sh
+docker run -d --name portainer \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v /home/docker/portainer:/data \
+    portainer/portainer-ce
+```
 
-**Or point the stack at an absolute path.** Works on any Portainer version:
+Portainer clones the stack to `/data/compose/42`, and compose expands `./conf`
+to `/data/compose/42/conf`. But on the host that directory is
+`/home/docker/portainer/compose/42/conf`. The daemon is handed `/data/...`,
+finds nothing there, and creates an empty `/data` tree at the host root.
+
+Three ways to avoid it, best first.
+
+**Make the path identical inside and outside.** Portainer takes `--data`, so
+mount its data directory at the same path it has on the host:
+
+```sh
+docker run -d --name portainer --restart=always \
+    -p 127.0.0.1:8000:8000 \
+    -p 127.0.0.1:9000:9000 \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v /home/docker/portainer:/home/docker/portainer \
+    portainer/portainer-ce --data /home/docker/portainer
+```
+
+Now `./conf` expands to a path that means the same thing to compose and to the
+daemon. Nothing else has to change, and every repository stack with relative
+bind mounts starts working, not just this one. Existing Portainer data is
+untouched: it is the same directory, mounted somewhere else.
+
+**Or let Portainer rewrite the paths.** Recent versions offer relative path
+volume support when creating the stack, where you give it the host path the
+repository lives at. Same result, configured per stack instead of once.
+
+**Or point the stack at an absolute path.** Works on any version:
 
 ```sh
 # On the host, once
 git clone <repository-url> /opt/jitsi
 ```
 
-Then set, in the stack's environment variables:
+Then, in the stack's environment variables:
 
 ```dotenv
 STACK_DIR=/opt/jitsi
 CONFIG=/opt/jitsi/data
 ```
 
-The trade-off is that `/opt/jitsi` is now updated with `git pull` rather than
-by Portainer.
+The trade-off is that `/opt/jitsi` is updated with `git pull` rather than by
+Portainer.
 
-To check which situation you are in, deploy and look at the init container:
+To check which situation you are in, deploy and read the init container:
 
 ```sh
 docker compose logs init
 ```
 
-If it reports missing files or nginx cannot find its configuration, the mounts
-did not resolve.
+If it reports files it cannot find, or nginx starts with no configuration, the
+mounts did not resolve.
 
 ### 7.3 The second catch: the environment file
 
@@ -670,9 +701,29 @@ Anything gitignored has to be placed on the host once, under whatever directory
 | Routes or site files | Edit them under `STACK_DIR`, then restart `nginx` |
 | The stack itself | **Pull and redeploy**, or let GitOps do it |
 
+### 7.6 Letting nginx reach Portainer
+
+To serve Portainer's own vhost from this stack, nginx has to reach it. A port
+published on `127.0.0.1` is not reachable from a container, so put Portainer on
+the shared network instead:
+
+```sh
+docker network connect jitsi-edge portainer
+```
+
+nginx then addresses it as `http://portainer:9000`, and the site file needs no
+published port at all.
+
+Run that command *after* the stack has been deployed once, since the stack
+creates the network. Do not add `--network jitsi-edge` to Portainer's own
+`docker run`: if the network were ever missing, Portainer would fail to start,
+and Portainer is the thing you would use to fix that. `docker network connect`
+fails harmlessly by comparison.
+
 > **Keep a way into Portainer that does not pass through this stack.** If its
 > vhost is served here and nginx fails to start, the console you would use to
-> fix it goes down with it. See section 5.3.
+> fix it goes down with it. Keep the published `127.0.0.1:9000`, reachable over
+> an SSH tunnel, as the way back in. See section 5.3.
 
 ---
 
