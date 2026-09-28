@@ -1,0 +1,32 @@
+# Sub-paths proxied somewhere other than Jitsi, per domain.
+#
+# Format, whitespace separated:
+#
+#     <domain>  <path-regex>  <target>  [option...]
+#
+#   domain      one of the domains listed in JITSI_DOMAINS
+#   path-regex  matched case-insensitively against the request path
+#   target      an upstream URL, or redirect:<status>:<location>
+#               use host.docker.internal to reach a port on the Docker host
+#
+# Options:
+#
+#   mirror=<url>,<url>   each URL receives a copy of the request and its
+#                        response is discarded, which is how one request fans
+#                        out to several backends
+#   host=<name>          override the Host header, for an upstream that serves
+#                        several tenants and needs the name it knows itself by
+#
+# Order matters: the first matching rule wins, as with any nginx location.
+# Copy to routes.conf and edit.
+
+# domain                path-regex              target                     options
+
+meet.example.org        ^/apps/waiting-room/    https://app.example.org
+meet.example.org        ^/rest/                 https://app.example.org
+meet.example.org        ^/notify/               https://events.example.org  mirror=https://backup-a.example.org,https://backup-b.example.org
+meet.example.org        ^/translate/            https://api.vendor.example   host=api.vendor.example
+meet.example.org        ^/legacy-close\.html$   redirect:302:/static/close2.html
+
+team.meet.example.org   ^/apps/waiting-room/    https://team.example.org
+team.meet.example.org   ^/rest/                 https://team.example.org

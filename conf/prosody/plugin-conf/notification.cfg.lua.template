@@ -1,0 +1,18 @@
+-- Room event notifications.
+--
+-- Rendered by conf/scripts/init.sh from the NOTIFICATION_* variables. Edit the
+-- template, not the generated file: the generated copy is replaced on every
+-- start.
+--
+-- Consumed by a MUC plugin that posts room lifecycle events to an HTTP
+-- endpoint. The endpoint normally points back at this deployment's own public
+-- URL, so that nginx routes the call on to its real destination.
+
+Component "@XMPP_MUC_DOMAIN@" "muc"
+    muc_room_notification_url         = "@NOTIFICATION_URL@"
+    muc_room_notification_user        = "@NOTIFICATION_USER@"
+    muc_room_notification_pass        = "@NOTIFICATION_PASSWORD@"
+    muc_room_notification_useragent   = "@NOTIFICATION_USERAGENT@"
+    muc_room_notification_timeout     = @NOTIFICATION_TIMEOUT@
+    muc_room_notification_retry_count = @NOTIFICATION_RETRY_COUNT@
+    muc_room_notification_retry_delay = @NOTIFICATION_RETRY_DELAY@

@@ -1,0 +1,170 @@
+# =============================================================================
+# Jitsi Meet -- self-contained stack
+# =============================================================================
+# Services are configured through `env_file` rather than an explicit list of
+# variable names. That keeps this file independent of the Jitsi release: a
+# variable added, renamed or dropped upstream needs no change here.
+# =============================================================================
+
+name: jitsi
+
+x-jitsi: &jitsi
+  restart: ${RESTART_POLICY:-unless-stopped}
+  env_file: .env
+  networks: [meet.jitsi]
+
+x-init-first: &init-first
+  init:
+    condition: service_completed_successfully
+
+volumes:
+  runtime:
+
+networks:
+  # The subnet is pinned rather than left to Docker because coturn's peer
+  # allow-list has to name it exactly.
+  meet.jitsi:
+    ipam:
+      config:
+        - subnet: ${STACK_SUBNET:-172.31.250.0/24}
+
+  # Shared with other stacks on this host whose containers nginx has to proxy
+  # to. They join it as an external network and can then stop publishing ports
+  # altogether; nginx reaches them by service name. This stack creates it, so
+  # nothing has to exist beforehand.
+  edge:
+    name: ${EDGE_NETWORK:-jitsi-edge}
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Renders every generated file, then exits. Everything else waits for it.
+  # ---------------------------------------------------------------------------
+  init:
+    image: alpine:latest
+    env_file: .env
+    restart: "no"
+    command: ["sh", "/conf/scripts/init.sh"]
+    volumes:
+      - ./conf:/conf
+      - ${CONFIG:-./data}:/data
+      - runtime:/runtime
+
+  # ---------------------------------------------------------------------------
+  # Edge proxy. Owns ports 80 and 443, and splits 443/tcp between HTTPS and
+  # TURN over TLS by inspecting the ALPN of each connection.
+  # ---------------------------------------------------------------------------
+  nginx:
+    <<: *jitsi
+    image: nginx:stable-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./conf/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./conf/nginx/sites:/etc/nginx/sites:ro
+      - ./conf/nginx/snippets:/etc/nginx/snippets:ro
+      - ./conf/certs:/conf/certs:ro
+      - ./conf/branding:/srv/branding:ro
+      - ./conf/routes.conf:/conf/routes.conf:ro
+      - ./conf/scripts/nginx-entrypoint.sh:/docker-entrypoint.d/30-jitsi.sh:ro
+      - runtime:/runtime:ro
+    networks: [meet.jitsi, edge]
+    extra_hosts:
+      # Only for services running on the host itself, outside Docker.
+      # Containers are reached over the edge network instead.
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      <<: *init-first
+      web:
+        condition: service_started
+
+  # ---------------------------------------------------------------------------
+  # STUN and TURN. Reached on 443/udp directly and on 443/tcp through nginx.
+  # ---------------------------------------------------------------------------
+  coturn:
+    <<: *jitsi
+    image: coturn/coturn:alpine
+    ports:
+      - "443:443/udp"
+    entrypoint: ["sh", "/conf/scripts/coturn.sh"]
+    volumes:
+      - ./conf/scripts:/conf/scripts:ro
+      - ./conf/certs:/conf/certs:ro
+      - runtime:/runtime:ro
+    depends_on: *init-first
+
+  # ---------------------------------------------------------------------------
+  # Jitsi Meet
+  # ---------------------------------------------------------------------------
+  web:
+    <<: *jitsi
+    image: jitsi/web:${JITSI_VERSION}
+    volumes:
+      - ${CONFIG:-./data}/web:/config:Z
+      - ${CONFIG:-./data}/transcripts:/usr/share/jitsi-meet/transcripts:Z
+    depends_on: *init-first
+
+  prosody:
+    <<: *jitsi
+    image: jitsi/prosody:${JITSI_VERSION}
+    expose: ["5222", "5280", "5347"]
+    volumes:
+      - ${CONFIG:-./data}/prosody/config:/config:Z
+      - ./conf/prosody/plugins:/prosody-plugins-custom:ro
+      - ./conf/certs:/conf/certs:ro
+    networks:
+      meet.jitsi:
+        aliases: ["${XMPP_SERVER:-xmpp.meet.jitsi}"]
+    depends_on: *init-first
+
+  jicofo:
+    <<: *jitsi
+    image: jitsi/jicofo:${JITSI_VERSION}
+    volumes:
+      - ${CONFIG:-./data}/jicofo:/config:Z
+    depends_on: [prosody]
+
+  jvb:
+    <<: *jitsi
+    image: jitsi/jvb:${JITSI_VERSION}
+    ports:
+      - "${JVB_PORT:-10000}:${JVB_PORT:-10000}/udp"
+    volumes:
+      - ${CONFIG:-./data}/jvb:/config:Z
+    depends_on: [prosody]
+
+  # ---------------------------------------------------------------------------
+  # SIP gateway and transcription. Off unless COMPOSE_PROFILES names "jigasi".
+  #
+  # Profiles are used rather than a separate overlay file so the stack stays a
+  # single compose file that Portainer can deploy: turning it on is a variable,
+  # not a different command line.
+  # ---------------------------------------------------------------------------
+  jigasi:
+    <<: *jitsi
+    profiles: ["jigasi"]
+    image: jitsi/jigasi:${JITSI_VERSION}
+    ports:
+      - "${JIGASI_PORT_MIN:-20000}-${JIGASI_PORT_MAX:-20050}:${JIGASI_PORT_MIN:-20000}-${JIGASI_PORT_MAX:-20050}/udp"
+    volumes:
+      - ${CONFIG:-./data}/jigasi:/config:Z
+      - ${CONFIG:-./data}/transcripts:/tmp/transcripts:Z
+      - ./conf/certs:/conf/certs:ro
+    depends_on: [prosody]
+
+  # ---------------------------------------------------------------------------
+  # Certificate issuance and renewal. Exits immediately when TLS_MODE=files.
+  # ---------------------------------------------------------------------------
+  acme:
+    <<: *jitsi
+    # on-failure, not the shared policy: the container exits 0 and stays down
+    # when TLS_MODE=files, but is restarted if renewal crashes.
+    image: neilpang/acme.sh:latest
+    restart: on-failure
+    entrypoint: ["sh", "/conf/scripts/acme.sh"]
+    volumes:
+      - ./conf/scripts:/conf/scripts:ro
+      - ./conf/certs:/conf/certs
+      - runtime:/runtime
+    depends_on: *init-first
