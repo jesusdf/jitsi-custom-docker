@@ -110,7 +110,8 @@ A TURN server on a well-known port is a standing invitation to relay abuse.
 
 - `use-auth-secret` with a secret shared with Prosody, which turns it into
   time-limited credentials. A client never receives a static password.
-- `no-multicast-peers`, `no-tcp-relay`, `no-cli`.
+- `no-multicast-peers`, `no-tcp-relay`; the CLI stays off, which is coturn's
+  default.
 - Every private and reserved range denied, with the stack's own subnet allowed
   back so relayed media reaches the bridge.
 
@@ -357,6 +358,29 @@ DNS natively, with no plugin and no image to build, and does HTTP-01 as well.
 It is also the client the Jitsi web image uses internally. Azure credentials
 are environment variables; no resource group or zone file is needed, because
 acme.sh discovers the zone.
+
+The `acme` service is the one exception to "every variable reaches every
+container": acme.sh reads bare names such as `LOG_LEVEL`, `DEBUG` and
+`LOG_FILE` with meanings of its own, so the compose file hands it an explicit
+environment instead of the shared file.
+
+### The first start
+
+nginx will not load a server block whose certificate is missing, and HTTP-01
+needs nginx answering on port 80 -- a deadlock on a fresh deployment. The
+`acme` container therefore writes a self-signed placeholder to
+`TLS_CERT_FILE` / `TLS_KEY_FILE` before its first order, and nginx and coturn
+wait for that file under an ACME mode. Once the real certificate is issued it
+overwrites the placeholder and the reload below takes over. acme.sh's own
+state -- account, orders, issued certificates -- lives under `CONFIG/acme/`,
+so a recreated container renews instead of issuing again.
+
+### Who reads the private key
+
+acme.sh installs the key readable by root only, and the coturn image runs as
+`nobody`. coturn is therefore started as root and told to drop to `nobody`
+itself (`proc-user`), which it does after loading the certificate and binding
+its ports.
 
 ### Reloading after renewal
 

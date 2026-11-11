@@ -188,6 +188,9 @@ render_coturn_config() {
            TURN_RELAY_MIN_PORT TURN_RELAY_MAX_PORT \
            TURN_ALLOWED_PEER_RANGE \
            TLS_CERT_FILE TLS_KEY_FILE
+
+    # Holds the TURN secret, and /runtime is a host directory.
+    chmod 600 /runtime/turnserver.conf
 }
 
 

@@ -28,9 +28,6 @@ x-init-first: &init-first
   init:
     condition: service_completed_successfully
 
-volumes:
-  runtime:
-
 networks:
   # The subnet is pinned rather than left to Docker because coturn's peer
   # allow-list has to name it exactly.
@@ -59,7 +56,7 @@ services:
     volumes:
       - ${STACK_DIR:-.}/conf:/conf
       - ${CONFIG:-./data}:/data
-      - runtime:/runtime
+      - ${CONFIG:-./data}/runtime:/runtime
 
   # ---------------------------------------------------------------------------
   # Edge proxy. Owns ports 80 and 443, and splits 443/tcp between HTTPS and
@@ -78,8 +75,9 @@ services:
       - ${STACK_DIR:-.}/conf/certs:/conf/certs:ro
       - ${STACK_DIR:-.}/conf/branding:/srv/branding:ro
       - ${STACK_DIR:-.}/conf/routes.conf:/conf/routes.conf:ro
+      - ${STACK_DIR:-.}/conf/scripts:/conf/scripts:ro
       - ${STACK_DIR:-.}/conf/scripts/nginx-entrypoint.sh:/docker-entrypoint.d/30-jitsi.sh:ro
-      - runtime:/runtime:ro
+      - ${CONFIG:-./data}/runtime:/runtime:ro
     networks: [meet.jitsi, edge]
     extra_hosts:
       # Only for services running on the host itself, outside Docker.
@@ -96,13 +94,17 @@ services:
   coturn:
     <<: *jitsi
     image: coturn/coturn:alpine
+    # The image runs as nobody, which cannot read a private key installed by
+    # the acme container. Start as root; turnserver drops to nobody itself
+    # once the certificate is loaded (proc-user in the template).
+    user: root
     ports:
       - "443:443/udp"
     entrypoint: ["sh", "/conf/scripts/coturn.sh"]
     volumes:
       - ${STACK_DIR:-.}/conf/scripts:/conf/scripts:ro
       - ${STACK_DIR:-.}/conf/certs:/conf/certs:ro
-      - runtime:/runtime:ro
+      - ${CONFIG:-./data}/runtime:/runtime:ro
     depends_on: *init-first
 
   # ---------------------------------------------------------------------------
@@ -168,14 +170,34 @@ services:
   # Certificate issuance and renewal. Exits immediately when TLS_MODE=files.
   # ---------------------------------------------------------------------------
   acme:
-    <<: *jitsi
-    # on-failure, not the shared policy: the container exits 0 and stays down
-    # when TLS_MODE=files, but is restarted if renewal crashes.
     image: neilpang/acme.sh:latest
+    # on-failure, not the shared policy: the container exits 0 and stays down
+    # when TLS_MODE=files, but is restarted if issuing or renewal fails.
     restart: on-failure
+    # Not the shared env_file: acme.sh reads bare names such as LOG_LEVEL,
+    # DEBUG and LOG_FILE that the Jitsi images use with other meanings. Only
+    # what the script needs is passed, and nothing else can leak in.
+    environment:
+      TLS_MODE: ${TLS_MODE:-files}
+      TLS_CERT_FILE: ${TLS_CERT_FILE:-/conf/certs/fullchain.pem}
+      TLS_KEY_FILE: ${TLS_KEY_FILE:-/conf/certs/privkey.pem}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+      ACME_DOMAINS: ${ACME_DOMAINS:-}
+      JITSI_DOMAINS: ${JITSI_DOMAINS:-}
+      AZUREDNS_SUBSCRIPTIONID: ${AZUREDNS_SUBSCRIPTIONID:-}
+      AZUREDNS_TENANTID: ${AZUREDNS_TENANTID:-}
+      AZUREDNS_APPID: ${AZUREDNS_APPID:-}
+      AZUREDNS_CLIENTSECRET: ${AZUREDNS_CLIENTSECRET:-}
+      TZ: ${TZ:-UTC}
+    networks: [meet.jitsi]
     entrypoint: ["sh", "/conf/scripts/acme.sh"]
     volumes:
       - ${STACK_DIR:-.}/conf/scripts:/conf/scripts:ro
       - ${STACK_DIR:-.}/conf/certs:/conf/certs
-      - runtime:/runtime
+      - ${CONFIG:-./data}/runtime:/runtime
+      # acme.sh's account and certificate state. Without it every recreated
+      # container would issue a fresh certificate and run into rate limits.
+      # Like everything under CONFIG, it must live outside any directory
+      # Portainer re-clones (see docs/deployment.md, chapter 7).
+      - ${CONFIG:-./data}/acme:/acme.sh
     depends_on: *init-first

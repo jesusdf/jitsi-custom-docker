@@ -359,10 +359,11 @@ strip_comments() {
 # Certificate renewal
 # -----------------------------------------------------------------------------
 # The ACME container touches a marker file after installing a new certificate.
-# Polling it is enough: certificates change a few times a year.
+# Polling it is enough: certificates change a few times a year. A minute keeps
+# the first start short, when the placeholder gives way to the real one.
 
 CERTIFICATE_MARKER=/runtime/certificate-updated
-CERTIFICATE_POLL_SECONDS=300
+CERTIFICATE_POLL_SECONDS=60
 
 reload_when_certificate_changes() {
     seen=$(certificate_marker_stamp)
@@ -384,6 +385,7 @@ certificate_marker_stamp() {
 # -----------------------------------------------------------------------------
 
 main() {
+    wait_for_certificate
     prepare_directories
     generate_tls_defaults
     generate_trusted_hosts

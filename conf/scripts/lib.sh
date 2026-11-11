@@ -77,3 +77,25 @@ is_enabled() {
         *) return 1 ;;
     esac
 }
+
+# Under an ACME mode the acme container provides the certificate -- a
+# placeholder at first -- and nginx and coturn cannot start until it exists.
+# Under TLS_MODE=files the operator supplies it, so there is nothing to wait
+# for and a missing file should fail loudly instead.
+wait_for_certificate() {
+    case "${TLS_MODE:-files}" in
+        acme-*) ;;
+        *) return 0 ;;
+    esac
+
+    waited=0
+    until [ -f "${TLS_CERT_FILE:-}" ] && [ -f "${TLS_KEY_FILE:-}" ]; do
+        if [ "$waited" -ge 120 ]; then
+            warn "no certificate after ${waited}s; continuing anyway"
+            return 0
+        fi
+        [ "$waited" -eq 0 ] && log "waiting for the acme container to provide a certificate"
+        sleep 2
+        waited=$(( waited + 2 ))
+    done
+}

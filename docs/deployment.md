@@ -156,9 +156,11 @@ each other, media is working.
 
 ### 3.1 How settings reach the containers
 
-Every variable in `.env` is passed to every container. The compose file
-deliberately does not list variable names, so any variable the Jitsi images
-support works without editing it -- including ones added in a later release.
+Every variable in `.env` is passed to every container, except the `acme`
+container, which gets only the TLS and ACME settings. The compose file
+deliberately does not list variable names for the rest, so any variable the
+Jitsi images support works without editing it -- including ones added in a
+later release.
 
 This is also why you can consult the [Jitsi environment variable
 reference](https://jitsi.github.io/handbook/docs/devops-guide/devops-guide-docker)
@@ -335,9 +337,9 @@ TLS_MODE=acme-http
 ACME_EMAIL=you@example.org
 ```
 
-Port 80 must be reachable from the internet. Every domain in `JITSI_DOMAINS`
-goes into one certificate as a SAN, unless you override the list with
-`ACME_DOMAINS`.
+Port 80 must be reachable from the internet, and DNS for every domain must
+already point at this host. Every domain in `JITSI_DOMAINS` goes into one
+certificate as a SAN, unless you override the list with `ACME_DOMAINS`.
 
 Wildcards are not possible over HTTP-01. Use DNS-01 if you need one.
 
@@ -357,12 +359,30 @@ AZUREDNS_CLIENTSECRET=...
 The service principal needs the **DNS Zone Contributor** role on the zone. You
 do not need to state the resource group or the zone: acme.sh finds them.
 
-### 4.4 Renewal
+### 4.4 The first start
+
+Until the first certificate is issued, the `acme` container puts a self-signed
+placeholder at `TLS_CERT_FILE` / `TLS_KEY_FILE` so that nginx and coturn can
+start. Browsers show a certificate warning for a minute or two; the real
+certificate replaces the placeholder as soon as it is issued and both
+containers pick it up as described below.
+
+acme.sh keeps its account and certificates under `CONFIG/acme/`. On every
+later start it finds them, sees the certificate is not due, and leaves the
+files alone -- no new order, no reload. Changing `ACME_DOMAINS` counts as a
+new certificate and is issued at once.
+
+If an order fails -- DNS not pointing here yet, wrong Azure credentials -- the
+container logs acme.sh's output, waits ten minutes and exits so the restart
+policy retries. Fix the cause and `docker compose restart acme` to retry
+sooner.
+
+### 4.5 Renewal
 
 The `acme` container wakes daily and asks acme.sh to renew anything close to
 expiry. After installing a new certificate it touches a marker file:
 
-- nginx notices within five minutes and reloads.
+- nginx notices within a minute and reloads.
 - coturn notices and exits; the restart policy brings it back with the new
   certificate.
 
@@ -567,7 +587,8 @@ Repository** and point it at the Git repository: the repository carries the
 compose file *and* `conf/`, which the containers bind-mount, so the web editor
 and file upload options are not enough on their own.
 
-Two things about repository stacks catch people out. Both are dealt with below.
+Three things about repository stacks catch people out. All are dealt with
+below.
 
 ### 7.1 Create the stack
 
@@ -576,71 +597,37 @@ Two things about repository stacks catch people out. Both are dealt with below.
    repository, credentials.
 3. Compose path: `docker-compose.yml`.
 4. Under **Environment variables**, add the contents of `.env.example` with
-   your values. Portainer writes these to a `stack.env` file next to the
-   compose file, which the stack reads alongside `.env`.
+   your values, with `STACK_DIR` and `CONFIG` set to absolute paths outside
+   Portainer's clone (section 7.2). Portainer writes these to a `stack.env`
+   file next to the compose file, which the stack reads alongside `.env`.
 5. Deploy.
 
 Optionally enable **GitOps updates** so Portainer re-pulls on a schedule or
-from a webhook. Your own files under `conf/` are gitignored, so a pull never
-overwrites them.
+from a webhook. With the paths from section 7.2, a pull only ever replaces
+the compose file; your files and the stack's state are elsewhere.
 
-### 7.2 The first catch: bind mounts and where the daemon looks
+### 7.2 The first catch: keep the files out of Portainer's clone
 
-The compose file mounts `conf/` into several containers. Compose turns a
-relative path into an absolute one using the directory the compose file is in,
-and hands that to the Docker daemon, which resolves it **on the host**.
+The compose file bind-mounts `conf/` and `CONFIG` into the containers. Left
+relative, both resolve inside the directory Portainer cloned the repository
+into, and two things go wrong there.
 
-For a repository stack, Portainer clones into its own `/data/compose/<id>`. If
-Portainer's `/data` is a named volume, that path does not exist on the host,
-and the daemon silently creates empty directories instead. The symptom is
-nginx failing to start with configuration it cannot find.
+**The daemon may not see that directory.** Compose turns `./conf` into an
+absolute path using the directory the compose file is in, and the Docker
+daemon resolves that path **on the host**. Portainer clones into its own data
+directory, which inside its container is `/data/compose/<id>`; unless that
+directory has the same path on the host, the daemon finds nothing there and
+silently creates empty directories instead. The symptom is nginx failing to
+start with configuration it cannot find.
 
-The mismatch is worth being precise about, because it is not obvious. Say
-Portainer runs like this:
+**Portainer replaces the clone on every redeploy.** Pulling from Git, by hand
+or through GitOps updates, does not update the directory in place: Portainer
+clones afresh and discards the old copy. Anything that is not in the
+repository -- certificates, `routes.conf`, site files, the Jitsi data, acme.sh's
+account and certificates -- goes with it.
 
-```sh
-docker run -d --name portainer \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    -v /home/docker/portainer:/data \
-    portainer/portainer-ce
-```
-
-Portainer clones the stack to `/data/compose/42`, and compose expands `./conf`
-to `/data/compose/42/conf`. But on the host that directory is
-`/home/docker/portainer/compose/42/conf`. The daemon is handed `/data/...`,
-finds nothing there, and creates an empty `/data` tree at the host root.
-
-Three ways to avoid it, best first.
-
-**Make the path identical inside and outside.** Portainer takes `--data`, so
-mount its data directory at the same path it has on the host:
-
-```sh
-docker run -d --name portainer --restart=always \
-    -p 127.0.0.1:8000:8000 \
-    -p 127.0.0.1:9000:9000 \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    -v /home/docker/portainer:/home/docker/portainer \
-    portainer/portainer-ce --data /home/docker/portainer
-```
-
-Now `./conf` expands to a path that means the same thing to compose and to the
-daemon. Nothing else has to change, and every repository stack with relative
-bind mounts starts working, not just this one. Existing Portainer data is
-untouched: it is the same directory, mounted somewhere else.
-
-Mount the parent instead -- `-v /home/docker:/home/docker` -- if you also want
-Portainer to manage stacks kept elsewhere under it, rather than only under its
-own data directory. That is the only reason to widen it: the bind mounts
-themselves are resolved by the daemon, which reads the host filesystem
-directly and needs nothing mounted into Portainer. Widening grants Portainer no
-authority it lacks either way, since it already has the Docker socket.
-
-**Or let Portainer rewrite the paths.** Recent versions offer relative path
-volume support when creating the stack, where you give it the host path the
-repository lives at. Same result, configured per stack instead of once.
-
-**Or point the stack at an absolute path.** Works on any version:
+The way around both is the same: give the stack a fixed directory on the host
+and name it absolutely.
 
 ```sh
 # On the host, once
@@ -654,8 +641,11 @@ STACK_DIR=/opt/jitsi
 CONFIG=/opt/jitsi/data
 ```
 
-The trade-off is that `/opt/jitsi` is updated with `git pull` rather than by
-Portainer.
+Portainer's clone now provides only the compose file; everything the
+containers read or write lives under `/opt/jitsi`, which no redeploy touches.
+The trade-off is that `conf/` -- scripts, templates, snippets -- is updated
+with `git pull` in `/opt/jitsi`, while a change to the compose file reaches
+Portainer through **Pull and redeploy**. Keep the two on the same commit.
 
 To check which situation you are in, deploy and read the init container:
 
@@ -698,6 +688,14 @@ Anything gitignored has to be placed on the host once, under whatever directory
 | `conf/branding/` | Logo, background, dynamic branding JSON |
 
 `conf/prosody/plugins/` fills itself: the init container downloads into it.
+
+`CONFIG` fills itself too, but is state worth keeping and backing up:
+
+| Path | What |
+|---|---|
+| `web/`, `prosody/`, `jicofo/`, `jvb/` | Configuration the Jitsi images generate |
+| `runtime/` | The rendered coturn configuration and the ACME challenge directory |
+| `acme/` | acme.sh's account key and issued certificates. Losing it means issuing again |
 
 ### 7.5 Updating
 

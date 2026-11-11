@@ -11,7 +11,7 @@ SCRIPT_NAME=coturn
 . /conf/scripts/lib.sh
 
 CERTIFICATE_MARKER=/runtime/certificate-updated
-POLL_INTERVAL_SECONDS=300
+POLL_INTERVAL_SECONDS=60
 
 
 current_marker() {
@@ -32,6 +32,11 @@ exit_when_certificate_changes() {
 
 
 main() {
+    wait_for_certificate
+
+    # Started as root so it can read the private key, which the acme
+    # container installs readable by root only; the configuration tells it to
+    # drop to nobody once the certificate and the listening sockets are open.
     turnserver -c /runtime/turnserver.conf &
     turnserver_pid=$!
 
