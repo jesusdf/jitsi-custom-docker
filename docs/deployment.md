@@ -576,8 +576,8 @@ Two things about repository stacks catch people out. Both are dealt with below.
    repository, credentials.
 3. Compose path: `docker-compose.yml`.
 4. Under **Environment variables**, add the contents of `.env.example` with
-   your values. Portainer writes these to an `.env` file next to the compose
-   file, which is where the stack reads them from.
+   your values. Portainer writes these to a `stack.env` file next to the
+   compose file, which the stack reads alongside `.env`.
 5. Deploy.
 
 Optionally enable **GitOps updates** so Portainer re-pulls on a schedule or
@@ -682,8 +682,8 @@ checks the variables that actually matter instead:
 
 Init exits non-zero, so nothing else starts on a half-configured stack.
 
-In normal use this never appears: Portainer writes the `.env` file from the
-variables you entered in step 4.
+In normal use this never appears: Portainer writes `stack.env` from the
+variables you entered in step 4, and the compose file reads that name too.
 
 ### 7.4 Files Portainer does not carry
 

@@ -8,15 +8,20 @@
 
 name: jitsi
 
+# Neither file is required. A Git clone has no .env: it is gitignored. Portainer
+# writes the stack's environment variables to stack.env instead, so both names
+# are accepted. When both are genuinely missing, init says which variables are
+# unset rather than compose failing with a path that means nothing to the
+# operator.
+x-env-files: &env-files
+  - path: .env
+    required: false
+  - path: stack.env
+    required: false
+
 x-jitsi: &jitsi
   restart: ${RESTART_POLICY:-unless-stopped}
-  # Not required, because a Git clone has no .env: it is gitignored. Portainer
-  # writes one from the stack's environment variables. When it is genuinely
-  # missing, init says which variables are unset rather than compose failing
-  # with a path that means nothing to the operator.
-  env_file:
-    - path: .env
-      required: false
+  env_file: *env-files
   networks: [meet.jitsi]
 
 x-init-first: &init-first
@@ -48,9 +53,7 @@ services:
   # ---------------------------------------------------------------------------
   init:
     image: alpine:latest
-    env_file:
-      - path: .env
-        required: false
+    env_file: *env-files
     restart: "no"
     command: ["sh", "/conf/scripts/init.sh"]
     volumes:
