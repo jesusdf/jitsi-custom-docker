@@ -191,8 +191,7 @@ EOF
 generate_default_server() {
     cat > "$GENERATED/http/02-default.conf" <<EOF
 server {
-    listen $HTTPS_BACKEND_PORT ssl proxy_protocol default_server;
-    listen [::]:$HTTPS_BACKEND_PORT ssl proxy_protocol default_server;
+    listen 127.0.0.1:$HTTPS_BACKEND_PORT ssl proxy_protocol default_server;
     server_name _;
 
     ssl_reject_handshake on;

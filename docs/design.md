@@ -85,6 +85,14 @@ set_real_ip_from 127.0.0.1;
 real_ip_header   proxy_protocol;
 ```
 
+Both internal listeners bind to loopback only, so the PROXY header can come
+from nothing but the splitter: a container on a shared network cannot reach
+them and present an address of its choosing. The access log takes the
+address straight from the header (`$proxy_protocol_addr`), guarded by the
+same loopback condition, because `real_ip` runs too late for requests nginx
+rejects outright -- plain HTTP sent to the TLS port, for instance -- which
+would otherwise be logged as `127.0.0.1`.
+
 coturn cannot read that header, so a second `stream` server consumes it and
 forwards plain TCP. **Known limitation:** coturn logs the proxy's address
 rather than the client's for TURN-over-TLS connections. Its peer rules are

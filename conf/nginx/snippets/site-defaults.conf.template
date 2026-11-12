@@ -8,8 +8,10 @@
 # It carries the listen directive, so a site file never needs to know that the
 # 443 splitter forwards HTTPS to an internal port.
 
-listen @HTTPS_BACKEND_PORT@ ssl proxy_protocol;
-listen [::]:@HTTPS_BACKEND_PORT@ ssl proxy_protocol;
+# Loopback only: the 443 splitter is the one client of this port, and it
+# connects over IPv4. Nothing on the Docker networks can reach it directly and
+# hand it a forged PROXY header. IPv6 clients are handled by the splitter.
+listen 127.0.0.1:@HTTPS_BACKEND_PORT@ ssl proxy_protocol;
 http2 on;
 
 # Connections arrive from the splitter on the loopback address. Reading the
