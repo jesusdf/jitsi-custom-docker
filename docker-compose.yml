@@ -37,11 +37,13 @@ networks:
         - subnet: ${STACK_SUBNET:-172.31.250.0/24}
 
   # Shared with other stacks on this host whose containers nginx has to proxy
-  # to. They join it as an external network and can then stop publishing ports
-  # altogether; nginx reaches them by service name. This stack creates it, so
-  # nothing has to exist beforehand.
+  # to. They join it too and can then stop publishing ports altogether; nginx
+  # reaches them by service name. Nobody owns it: it is created once on the
+  # host (`docker network create jitsi-edge`), so no stack can remove it from
+  # under the others or has to be up for them to start.
   edge:
     name: ${EDGE_NETWORK:-jitsi-edge}
+    external: true
 
 services:
 

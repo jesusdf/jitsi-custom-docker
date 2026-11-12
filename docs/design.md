@@ -310,12 +310,18 @@ Two changes are needed in a migrated file:
 2. Certificate paths move under `conf/certs/`.
 
 **Reaching those backends.** When the backend is itself a container -- which it
-usually is -- the stack creates a shared network (`EDGE_NETWORK`) that other
-stacks join as external. The backend then publishes no port at all and nginx
-addresses it by service name. That is strictly better than publishing a port:
-the service becomes unreachable from outside the host, and correctness no
-longer depends on a firewall rule. Both approaches require a change in the
-other stack, so the shared network costs nothing extra.
+usually is -- it joins a shared network (`EDGE_NETWORK`) together with nginx.
+The backend then publishes no port at all and nginx addresses it by service
+name. That is strictly better than publishing a port: the service becomes
+unreachable from outside the host, and correctness no longer depends on a
+firewall rule. Both approaches require a change in the other stack, so the
+shared network costs nothing extra.
+
+The network is created once on the host and declared external by every stack,
+this one included. Were this stack to own it, `docker compose down` would try
+to remove it -- failing noisily while other containers are attached, and
+succeeding when they are not, after which those stacks could not start until
+this one was up again.
 
 For a backend running on the host outside Docker there is no network to share,
 and `host.docker.internal` is used instead. Such a service still has to listen

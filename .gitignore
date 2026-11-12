@@ -8,6 +8,6 @@ private/
 !/conf/certs/.gitkeep
 /conf/branding/*
 !/conf/branding/.gitkeep
-/conf/nginx/sites/*.conf
+/conf/nginx/sites/*
 /conf/prosody/plugins/*
 !/conf/prosody/plugins/.gitkeep

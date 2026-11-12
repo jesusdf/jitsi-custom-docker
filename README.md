@@ -35,6 +35,7 @@ $EDITOR conf/routes.conf     # sub-paths proxied elsewhere, per domain
 cp /path/to/fullchain.pem conf/certs/
 cp /path/to/privkey.pem   conf/certs/
 
+docker network create jitsi-edge  # once per host; shared with other stacks
 docker compose up -d
 ```
 
@@ -157,7 +158,7 @@ nginx is the only service on both networks, so it appears twice above.
 | Network | Members | Why |
 |---|---|---|
 | `meet.jitsi` | every service | The stack's own private network. Its subnet is pinned because coturn's peer allow-list has to name it exactly |
-| `jitsi-edge` | `nginx`, plus containers from other stacks | Lets nginx proxy to other stacks without any of them publishing a port on the host. Created by this stack; the others join it as external |
+| `jitsi-edge` | `nginx`, plus containers from other stacks | Lets nginx proxy to other stacks without any of them publishing a port on the host. Created once on the host; every stack joins it as external |
 
 ### Services
 

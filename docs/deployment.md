@@ -116,6 +116,15 @@ The format is covered in section 3.2.
 
 ### 2.5 Start it
 
+The shared network that other stacks will join is created once, on the host,
+outside any stack (chapter 5 explains why):
+
+```sh
+docker network create jitsi-edge
+```
+
+Then:
+
 ```sh
 docker compose up -d
 docker compose logs -f init nginx
@@ -465,13 +474,14 @@ The backend **stops publishing any port at all** and joins a network shared
 with the proxy. nginx then reaches it by service name, over Docker's own
 network, and the service becomes unreachable from outside the host entirely.
 
-This stack creates the network, so nothing has to exist beforehand:
+The network belongs to no stack. It is created once on the host, and every
+stack -- this one included -- declares it as external. If it belonged to this
+stack, `docker compose down` would try to remove it: noisily while other
+containers are attached, and successfully when they are not, leaving the other
+stacks unable to start until this one was up again.
 
-```yaml
-# docker-compose.yml, already present
-networks:
-  edge:
-    name: ${EDGE_NETWORK:-jitsi-edge}
+```sh
+docker network create jitsi-edge      # once per host
 ```
 
 In the *other* stack, declare it as external and join it:
@@ -610,6 +620,14 @@ below.
 
 ### 7.1 Create the stack
 
+Before the first deploy, create the shared network on the host once:
+
+```sh
+docker network create jitsi-edge
+```
+
+Then:
+
 1. **Stacks -> Add stack**, give it a name, choose **Repository**.
 2. Repository URL, reference (`refs/heads/main`) and, for a private
    repository, credentials.
@@ -737,11 +755,10 @@ docker network connect jitsi-edge portainer
 nginx then addresses it as `http://portainer:9000`, and the site file needs no
 published port at all.
 
-Run that command *after* the stack has been deployed once, since the stack
-creates the network. Do not add `--network jitsi-edge` to Portainer's own
-`docker run`: if the network were ever missing, Portainer would fail to start,
-and Portainer is the thing you would use to fix that. `docker network connect`
-fails harmlessly by comparison.
+Do not add `--network jitsi-edge` to Portainer's own `docker run`: if the
+network were ever missing, Portainer would fail to start, and Portainer is the
+thing you would use to fix that. `docker network connect` fails harmlessly by
+comparison.
 
 > **Keep a way into Portainer that does not pass through this stack.** If its
 > vhost is served here and nginx fails to start, the console you would use to
