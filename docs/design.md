@@ -302,7 +302,11 @@ has to know which internal port the splitter forwards to.
 Two changes are needed in a migrated file:
 
 1. `localhost` and `127.0.0.1` now mean the container. Use
-   `host.docker.internal`, which the compose file maps to the Docker host.
+   `host.docker.internal`, which the compose file maps to the Docker host --
+   written literally in `proxy_pass`, because the name lives in `/etc/hosts`
+   and Docker's embedded DNS, which nginx asks for backends held in
+   variables, does not serve it. `routes.conf` targets get the same
+   treatment automatically: the generator substitutes the address.
 2. Certificate paths move under `conf/certs/`.
 
 **Reaching those backends.** When the backend is itself a container -- which it

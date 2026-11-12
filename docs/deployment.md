@@ -400,16 +400,33 @@ serve has to move into it.
 Copy the server block into `conf/nginx/sites/`, one file per site, and make two
 changes.
 
-**First, backends.** Inside a container, `localhost` is the container. Use
-`host.docker.internal`, and name the backend through a variable so nginx
-resolves it per request:
+**First, backends.** Inside a container, `localhost` is the container. What
+replaces it depends on where the backend runs.
+
+For a service on the Docker host, use `host.docker.internal`, written
+literally in `proxy_pass`:
 
 ```nginx
 # Before
 proxy_pass http://127.0.0.1:9000;
 
 # After
-set $backend "http://host.docker.internal:9000";
+proxy_pass http://host.docker.internal:9000;
+```
+
+Do **not** put that name in a variable. A backend named through a variable is
+looked up per request in Docker's embedded DNS, which does not know
+`host.docker.internal`: the name exists only in the container's `/etc/hosts`,
+which nginx consults only when it resolves a literal name at startup. The
+address behind it never changes while the container runs, so resolving once is
+exactly right.
+
+For a service that is itself a container, do the opposite: name it by service
+name, through a variable, so nginx picks up a new address when the container
+is recreated (section 5.2):
+
+```nginx
+set $backend "http://portainer:9000";
 proxy_pass $backend;
 ```
 
@@ -500,10 +517,11 @@ extra and removes a class of mistake.
 #### If the backend runs on the host, outside Docker
 
 Then there is no network to share, and `host.docker.internal` is the way in.
-The compose file maps it to the Docker host for the `nginx` service:
+The compose file maps it to the Docker host for the `nginx` service. Write it
+literally, not through a variable (section 5.1):
 
 ```nginx
-set $backend "http://host.docker.internal:7000";
+proxy_pass http://host.docker.internal:7000;
 ```
 
 The service has to be listening on an address the container can reach, which
@@ -755,7 +773,8 @@ The usual causes:
 | Message | Cause |
 |---|---|
 | `cannot load certificate` | `TLS_CERT_FILE` points at a file that is not there |
-| `host not found in upstream` | A drop-in site names a backend directly instead of through a variable |
+| `host not found in upstream` | A drop-in site names a container directly instead of through a variable |
+| `host.docker.internal could not be resolved` | A drop-in site puts `host.docker.internal` in a variable; write it literally (section 5.1) |
 | `unknown directive` | A snippet copied from a host nginx uses a module this image lacks |
 
 ### The page loads but nobody connects

@@ -269,6 +269,18 @@ EOF
 # A mirror target receives a copy of the request and its response is discarded,
 # which is how one deployment fans a notification out to several backends.
 
+# Backends are named through variables so nginx resolves them per request --
+# but it then asks Docker's embedded DNS, which has never heard of
+# host.docker.internal: that name exists only in /etc/hosts, put there by the
+# compose file. Its address is fixed for the life of the container, so it is
+# substituted once here.
+DOCKER_HOST_ADDRESS=$(getent hosts host.docker.internal 2>/dev/null | cut -d' ' -f1)
+
+resolve_docker_host() {
+    [ -n "$DOCKER_HOST_ADDRESS" ] || { printf '%s' "$1"; return; }
+    printf '%s' "$1" | sed "s|host\.docker\.internal|$DOCKER_HOST_ADDRESS|g"
+}
+
 write_routes_for() {
     domain=$1
     [ -f "$ROUTES_FILE" ] || return 0
@@ -284,7 +296,7 @@ write_routes_for() {
 
 write_route() {
     path=$1
-    target=$2
+    target=$(resolve_docker_host "$2")
     options=$3
     mirror_id=$4
 
@@ -295,7 +307,7 @@ write_route() {
             ;;
     esac
 
-    mirror_urls=$(option_value "$options" mirror | tr ',' ' ')
+    mirror_urls=$(resolve_docker_host "$(option_value "$options" mirror)" | tr ',' ' ')
     host_override=$(option_value "$options" host)
 
     printf '    location ~* %s {\n' "$path"
