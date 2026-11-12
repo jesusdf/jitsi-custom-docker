@@ -286,6 +286,16 @@ which is why the generated server blocks send permissive CORS headers.
 a copy of the request and its response is discarded, which is how one
 deployment fans a notification out to several backends.
 
+### Hosts nobody serves
+
+A request by IP address, or with an SNI that matches no vhost, would land on
+whichever `server` block nginx reads first -- a Jitsi domain -- and get the
+page. The generator therefore adds a `default_server` on the HTTPS listener
+with `ssl_reject_handshake on`: the TLS negotiation is cut short and the
+client gets no page, no certificate and no hint of what runs here. Scanners
+that sweep address ranges see a closed door. Port 80 keeps redirecting to
+HTTPS, where the same rejection applies.
+
 ### Sites that are not Jitsi
 
 A host reverse proxy usually serves more than Jitsi. Those vhosts vary too much

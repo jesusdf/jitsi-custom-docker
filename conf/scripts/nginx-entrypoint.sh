@@ -181,6 +181,27 @@ EOF
 
 
 # -----------------------------------------------------------------------------
+# Unknown hosts
+# -----------------------------------------------------------------------------
+# A request that names none of our vhosts -- by IP address, or with an SNI
+# nobody serves -- would otherwise land on whichever server block comes first,
+# which is a Jitsi domain, and get a page. Rejecting the TLS handshake instead
+# gives scanners nothing: no page, no certificate, no hint of what runs here.
+
+generate_default_server() {
+    cat > "$GENERATED/http/02-default.conf" <<EOF
+server {
+    listen $HTTPS_BACKEND_PORT ssl proxy_protocol default_server;
+    listen [::]:$HTTPS_BACKEND_PORT ssl proxy_protocol default_server;
+    server_name _;
+
+    ssl_reject_handshake on;
+}
+EOF
+}
+
+
+# -----------------------------------------------------------------------------
 # Jitsi domains
 # -----------------------------------------------------------------------------
 
@@ -404,6 +425,7 @@ main() {
     generate_stream_config
     generate_resolver
     generate_http_redirect
+    generate_default_server
     generate_jitsi_sites
 
     # Only under an ACME mode, because only then does anything renew the

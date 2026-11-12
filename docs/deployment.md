@@ -547,7 +547,15 @@ with it, and the console is what you would have used to fix it.
 Serve it here if you like, but keep a second route that does not pass through
 the stack -- its own port on the host, firewalled to trusted addresses.
 
-### 5.4 Extra listening ports
+### 5.4 Requests by IP address
+
+A request that names none of your domains -- by IP, or with an SNI nobody
+serves -- gets its TLS handshake rejected rather than a page. That is
+generated, nothing to configure. It also means a drop-in site is reachable
+only under the names in its `server_name`; a typo there shows up as a TLS
+error in the browser, not as the wrong site.
+
+### 5.5 Extra listening ports
 
 The stack publishes only 80 and 443. If a migrated vhost listened elsewhere,
 add that port to the `nginx` service in `docker-compose.yml`.
