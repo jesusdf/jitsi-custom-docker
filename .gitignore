@@ -9,5 +9,7 @@ private/
 /conf/branding/*
 !/conf/branding/.gitkeep
 /conf/nginx/sites/*
+/conf/nginx/www/*
+!/conf/nginx/www/.gitkeep
 /conf/prosody/plugins/*
 !/conf/prosody/plugins/.gitkeep

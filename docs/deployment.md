@@ -457,6 +457,14 @@ to know which internal port the 443 splitter forwards to.
 To add a snippet of your own, drop it in `conf/nginx/snippets/`; it is
 published at `/etc/nginx/<name>.conf` too.
 
+**Third, static files.** A vhost that serves files rather than proxying, or
+alongside proxying, puts them under `conf/nginx/www/`, which nginx sees as
+`/var/www`:
+
+```nginx
+root /var/www/status.example.org;
+```
+
 > **IP allow-lists keep working.** The splitter passes the client address
 > through the PROXY protocol and `site-defaults.conf` restores it, so
 > `$remote_addr` is the real client.
@@ -729,6 +737,7 @@ Anything gitignored has to be placed on the host once, under whatever directory
 | `conf/certs/` | Certificate and key, when `TLS_MODE=files`. Any extra CA |
 | `conf/routes.conf` | Sub-path routes. Copy from `conf/routes.conf.example` |
 | `conf/nginx/sites/` | Site files for anything that is not Jitsi |
+| `conf/nginx/www/` | Static files served by those sites, mounted at `/var/www` |
 | `conf/branding/` | Logo, background, dynamic branding JSON |
 
 `conf/prosody/plugins/` fills itself: the init container downloads into it.

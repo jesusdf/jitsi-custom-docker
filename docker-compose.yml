@@ -76,6 +76,7 @@ services:
       - ${STACK_DIR:-.}/conf/nginx/snippets:/etc/nginx/snippets:ro
       - ${STACK_DIR:-.}/conf/certs:/conf/certs:ro
       - ${STACK_DIR:-.}/conf/branding:/srv/branding:ro
+      - ${STACK_DIR:-.}/conf/nginx/www:/var/www:ro
       - ${STACK_DIR:-.}/conf/routes.conf:/conf/routes.conf:ro
       - ${STACK_DIR:-.}/conf/scripts:/conf/scripts:ro
       - ${STACK_DIR:-.}/conf/scripts/nginx-entrypoint.sh:/docker-entrypoint.d/30-jitsi.sh:ro
