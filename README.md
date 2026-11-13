@@ -55,7 +55,8 @@ conf/
   nginx/
     nginx.conf            static: the 443 split and the include layout
     snippets/             included by site files
-    sites/                vhosts that are not part of this deployment
+    sites/                vhosts that are not part of this deployment;
+                          static-site.conf.example shows one that serves files
     www/                  static files those vhosts serve, at /var/www
   prosody/
     plugins/              downloaded on startup

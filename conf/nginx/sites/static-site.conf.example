@@ -1,0 +1,37 @@
+# A vhost that serves static files from conf/nginx/www/, which nginx sees as
+# /var/www. Copy to <domain>.conf in this directory, adjust the names, and
+# restart nginx. Only *.conf files are loaded, so this example is inert.
+#
+# Everything a host nginx would need is already in place: the listen
+# directive and TLS settings come from site-defaults.conf, and requests that
+# name no vhost are rejected at the TLS handshake, so a typo in server_name
+# shows up as a certificate error rather than as the wrong site.
+
+server {
+    server_name docs.example.org;
+
+    # The stack's certificate covers every name in ACME_DOMAINS. A name
+    # outside it needs its own files under conf/certs/.
+    ssl_certificate     /conf/certs/fullchain.pem;
+    ssl_certificate_key /conf/certs/privkey.pem;
+
+    include /etc/nginx/site-defaults.conf;
+
+    # Asks crawlers to stay out. Remove it for a site that should be indexed.
+    include /etc/nginx/no-robots.conf;
+
+    # One directory per site keeps several of them apart under www/.
+    root /var/www/docs.example.org;
+
+    location / {
+        # The file, else the directory's index.html, else 404 -- never a
+        # fall-through to another site.
+        try_files $uri $uri/ =404;
+    }
+
+    # Long-lived caching for fingerprinted assets, if the site has any.
+    # location ~* \.(css|js|woff2|png|svg)$ {
+    #     expires 30d;
+    #     add_header Cache-Control "public";
+    # }
+}

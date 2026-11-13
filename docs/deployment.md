@@ -465,6 +465,9 @@ alongside proxying, puts them under `conf/nginx/www/`, which nginx sees as
 root /var/www/status.example.org;
 ```
 
+`conf/nginx/sites/static-site.conf.example` is a complete vhost of that kind,
+ready to copy to `<domain>.conf`.
+
 > **IP allow-lists keep working.** The splitter passes the client address
 > through the PROXY protocol and `site-defaults.conf` restores it, so
 > `$remote_addr` is the real client.
