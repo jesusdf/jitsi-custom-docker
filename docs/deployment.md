@@ -519,6 +519,9 @@ Compose registers each service name as a network alias on every network it
 joins, so the name resolves across stacks without container names or fixed
 addresses.
 
+`conf/nginx/sites/proxied-container.conf.example` is a complete vhost of this
+kind, ready to copy to `<domain>.conf`.
+
 What this buys you over publishing a port:
 
 | | Published port | Shared network |

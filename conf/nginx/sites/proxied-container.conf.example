@@ -1,0 +1,62 @@
+# A vhost that proxies to a container running in another stack, reached over
+# the shared jitsi-edge network. Copy to <domain>.conf in this directory,
+# adjust the names, and restart nginx. Only *.conf files are loaded, so this
+# example is inert.
+#
+# The other stack joins the network and stops publishing the port:
+#
+#     services:
+#       app:
+#         networks: [default, jitsi-edge]
+#         # ports: no longer needed -- delete it
+#
+#     networks:
+#       jitsi-edge:
+#         external: true
+#
+# Compose registers the service name as a DNS alias on every network it
+# joins, so nginx reaches it as http://app:<port>, where <port> is the one the
+# process listens on inside the container, not the one that used to be
+# published on the host.
+
+server {
+    server_name app.example.org;
+
+    # The stack's certificate covers every name in ACME_DOMAINS. A name
+    # outside it needs its own files under conf/certs/.
+    ssl_certificate     /conf/certs/fullchain.pem;
+    ssl_certificate_key /conf/certs/privkey.pem;
+
+    include /etc/nginx/site-defaults.conf;
+
+    # Asks crawlers to stay out. Remove it for a site that should be indexed.
+    include /etc/nginx/no-robots.conf;
+
+    location / {
+        # Through a variable, so nginx resolves the name on each request and
+        # follows the container when it is recreated with a new address. A
+        # literal here would be resolved once at startup -- and would keep
+        # nginx from starting at all while the other stack is down.
+        #
+        # This is the opposite of a backend on the Docker host itself, which
+        # is written literally: proxy_pass http://host.docker.internal:7000;
+        set $backend "http://app:8080";
+        proxy_pass $backend;
+
+        # Host, X-Real-IP, X-Forwarded-For, X-Forwarded-Proto https.
+        include /etc/nginx/proxy-defaults.conf;
+
+        # Only if the application uses WebSockets.
+        # proxy_set_header Upgrade    $http_upgrade;
+        # proxy_set_header Connection $connection_upgrade;
+        # proxy_read_timeout 3600s;
+    }
+
+    # An administrative area reachable from TRUSTED_HOSTS only.
+    # location /admin/ {
+    #     include /etc/nginx/only-trusted-hosts.conf;
+    #     set $backend "http://app:8080";
+    #     proxy_pass $backend;
+    #     include /etc/nginx/proxy-defaults.conf;
+    # }
+}
