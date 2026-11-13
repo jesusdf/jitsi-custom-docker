@@ -14,6 +14,11 @@
 listen 127.0.0.1:@HTTPS_BACKEND_PORT@ ssl proxy_protocol;
 http2 on;
 
+# Redirects nginx issues itself -- a directory asked for without its trailing
+# slash, for instance -- would otherwise name this internal port in Location,
+# sending the browser to https://host:8443/.
+port_in_redirect off;
+
 # Connections arrive from the splitter on the loopback address. Reading the
 # client address from the PROXY header restores it for logs and allow-lists.
 set_real_ip_from 127.0.0.1;
