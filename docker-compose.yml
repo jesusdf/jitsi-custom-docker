@@ -62,7 +62,7 @@ services:
 
   # ---------------------------------------------------------------------------
   # Edge proxy. Owns ports 80 and 443, and splits 443/tcp between HTTPS and
-  # TURN over TLS by inspecting the ALPN of each connection.
+  # TURN over TLS by the name each connection asks for (TURNS_HOST).
   # ---------------------------------------------------------------------------
   nginx:
     <<: *jitsi
@@ -187,6 +187,7 @@ services:
       ACME_EMAIL: ${ACME_EMAIL:-}
       ACME_DOMAINS: ${ACME_DOMAINS:-}
       JITSI_DOMAINS: ${JITSI_DOMAINS:-}
+      TURNS_HOST: ${TURNS_HOST:-}
       AZUREDNS_SUBSCRIPTIONID: ${AZUREDNS_SUBSCRIPTIONID:-}
       AZUREDNS_TENANTID: ${AZUREDNS_TENANTID:-}
       AZUREDNS_APPID: ${AZUREDNS_APPID:-}

@@ -16,6 +16,18 @@ split_list() {
     printf '%s\n' "$1" | tr ',\t ' '\n\n\n' | sed '/^$/d'
 }
 
+# The names in TURNS_HOST that no Jitsi domain also uses, one per line.
+#
+# nginx sends every TLS connection for one of these names to coturn. A name
+# that is also a served domain would take that domain's HTTPS with it, so it is
+# left out.
+dedicated_turns_hosts() {
+    split_list "${TURNS_HOST:-}" | while read -r host; do
+        split_list "${JITSI_DOMAINS:-}" | grep -qixF "$host" && continue
+        printf '%s\n' "$host"
+    done
+}
+
 # Escapes a value so it can be used as a sed replacement.
 escape_replacement() {
     printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'

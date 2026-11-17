@@ -71,7 +71,8 @@ leave alone:
 | `JITSI_VERSION` | Any `stable-*` tag, for example `stable-11031` |
 | `JITSI_DOMAINS` | Comma-separated. All of them share one room namespace |
 | `PUBLIC_URL` | The primary domain, with scheme. Signalling always goes here |
-| `TURN_HOST`, `TURNS_HOST` | Usually the primary domain, because the certificate has to match |
+| `TURN_HOST` | Usually the primary domain |
+| `TURNS_HOST` | A name of its own for TURN over TLS, such as `turn.example.org`, pointing at this host. Not one of `JITSI_DOMAINS` |
 | `DOCKER_HOST_ADDRESS` | The host's address on its local network |
 | `JWT_APP_ID`, `JWT_APP_SECRET` | If you use JWT authentication |
 
@@ -152,9 +153,14 @@ looks like this:
 # The page loads and the certificate is the right one
 curl -sI https://meet.example.org | head -1
 
-# TURN answers on 443/tcp, separated from HTTPS by ALPN
-openssl s_client -connect meet.example.org:443 -alpn stun.turn </dev/null 2>&1 | grep -i 'ALPN\|Verify return'
+# TURN answers on 443/tcp as a browser reaches it: by name, with no ALPN.
+# coturn says nothing to an HTTP request; the web answers with an HTTP status.
+printf 'GET / HTTP/1.0\r\n\r\n' | openssl s_client -quiet -connect turn.example.org:443 -servername turn.example.org 2>/dev/null | head -1
 ```
+
+An empty line is coturn. An `HTTP/1.1` status line means the connection went
+to the web: `TURNS_HOST` is missing or is one of `JITSI_DOMAINS`, and the nginx
+log says so at startup.
 
 Then open a room in two browsers on different networks. If both see and hear
 each other, media is working.
@@ -310,9 +316,12 @@ The cleanest route is dynamic branding, which can differ per domain:
 DYNAMIC_BRANDING_URL=https://meet.example.org/branding/dynamic-branding.json
 ```
 
-For names and watermarks, create `conf/branding/custom-interface_config.js`
-and copy it into `data/web/`; the image appends it to the generated
-`interface_config.js`.
+For names and watermarks, create `conf/branding/custom-interface_config.js`.
+For options of `config.js` that have no environment variable, create
+`conf/branding/custom-config.js`. `init` copies both into `data/web/` on every
+start -- after the stack's own `conf/web/custom-config.js` in the second case --
+and the image appends them to the files it generates. Edit them in
+`conf/branding/`, not in `data/web/`, where they are overwritten.
 
 > **Favicons and PWA icons have no supported mechanism.** Replacing them means
 > bind-mounting files over paths inside the image, which can break on upgrade.
@@ -326,6 +335,13 @@ EXTRA_CA_FILE=/conf/certs/internal-ca.crt
 
 Put the certificate in `conf/certs/`. `init` merges it with the public roots
 into `conf/certs/ca-bundle.crt` and points Prosody at the result.
+
+### 3.7 TURN over UDP to the bridge
+
+By default the web client only relays its connection to the bridge over TURN
+on TCP, which here means TLS through `TURNS_HOST`. The stack sets
+`config.useTurnUdp = true` in `conf/web/custom-config.js`, so networks that
+block UDP 10000 but allow UDP 443 relay over UDP instead, which is lighter.
 
 ---
 
@@ -843,8 +859,14 @@ discovery. While you are there, confirm TURN is reachable, since that is the
 fallback when direct media fails:
 
 ```sh
-openssl s_client -connect <TURN_HOST>:443 -alpn stun.turn </dev/null 2>&1 | head -5
+printf 'GET / HTTP/1.0\r\n\r\n' | openssl s_client -quiet -connect <TURNS_HOST>:443 -servername <TURNS_HOST> 2>/dev/null | head -1
 ```
+
+Nothing back means coturn; an `HTTP/1.1` line means the web (section 2.6).
+
+To test TURN alone from a browser, open a room with
+`#config.forceTurnRelay=true` at the end of the URL. Media then has to go
+through coturn, so if the room connects, TURN works.
 
 ### Room notifications never arrive
 

@@ -1,7 +1,8 @@
 #!/bin/sh
 # Prepares everything the other containers expect to find already in place:
-# the CA bundle, the Prosody plugins and their configuration, and the coturn
-# configuration. Runs to completion before any other service starts.
+# the CA bundle, the Prosody plugins and their configuration, the coturn
+# configuration and the web client's extra options. Runs to completion before
+# any other service starts.
 
 set -eu
 
@@ -173,9 +174,11 @@ render_coturn_config() {
         log "TURN_CREDENTIALS is empty; coturn will refuse connections"
     fi
 
-    TURN_EXTERNAL_IP=${TURN_EXTERNAL_IP:-${JVB_ADVERTISE_IPS:-}}
+    # No fallback to JVB_ADVERTISE_IPS. The relay range is not published, so a
+    # relay address on the public IP would be one nobody can reach; the
+    # internal one is what the bridge and other relayed clients can use.
     TURN_EXTERNAL_IP_LINE=""
-    [ -n "$TURN_EXTERNAL_IP" ] && TURN_EXTERNAL_IP_LINE="external-ip=$TURN_EXTERNAL_IP"
+    [ -n "${TURN_EXTERNAL_IP:-}" ] && TURN_EXTERNAL_IP_LINE="external-ip=$TURN_EXTERNAL_IP"
     export TURN_EXTERNAL_IP_LINE
 
     # The peer allow-list has to name the stack's own subnet exactly, which is
@@ -191,6 +194,34 @@ render_coturn_config() {
 
     # Holds the TURN secret, and /runtime is a host directory.
     chmod 600 /runtime/turnserver.conf
+}
+
+
+# -----------------------------------------------------------------------------
+# Web client
+# -----------------------------------------------------------------------------
+# The web image appends /config/custom-config.js and
+# /config/custom-interface_config.js to the files it generates. Both are rebuilt
+# here on every start, so data/web never holds the only copy: the stack's own
+# options come from conf/web/, the operator's from conf/branding/.
+
+WEB_CONF_DIR=/conf/web
+BRANDING_DIR=/conf/branding
+
+render_web_config() {
+    {
+        cat "$WEB_CONF_DIR/custom-config.js"
+        if [ -f "$BRANDING_DIR/custom-config.js" ]; then
+            printf '\n'
+            cat "$BRANDING_DIR/custom-config.js"
+        fi
+    } > /data/web/custom-config.js
+
+    if [ -f "$BRANDING_DIR/custom-interface_config.js" ]; then
+        cp "$BRANDING_DIR/custom-interface_config.js" /data/web/custom-interface_config.js
+    else
+        rm -f /data/web/custom-interface_config.js
+    fi
 }
 
 
@@ -222,6 +253,7 @@ main() {
     download_plugins
     render_prosody_fragments
     render_coturn_config
+    render_web_config
     log "ready"
 }
 

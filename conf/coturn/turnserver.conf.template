@@ -2,8 +2,8 @@
 #
 # Reachable two ways, both on port 443:
 #   * 443/udp  directly, for STUN and TURN over UDP
-#   * 443/tcp  through nginx, which routes TLS connections whose ALPN is
-#              "stun.turn" here on port 5349
+#   * 443/tcp  through nginx, which routes TLS connections for TURNS_HOST, or
+#              with the ALPN "stun.turn", here on port 5349
 #
 # The relay port range faces the video bridge, never the client, so it does not
 # need to be reachable from the internet.

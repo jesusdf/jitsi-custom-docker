@@ -34,11 +34,13 @@ RENEWAL_INTERVAL_SECONDS=86400
 RETRY_AFTER_FAILURE_SECONDS=600
 
 
+# coturn presents the same certificate, so a TURNS_HOST of its own has to be in
+# it too.
 certificate_domains() {
     if [ -n "${ACME_DOMAINS:-}" ]; then
         split_list "$ACME_DOMAINS" | tr '\n' ' '
     else
-        split_list "${JITSI_DOMAINS:-}" | tr '\n' ' '
+        { split_list "${JITSI_DOMAINS:-}"; dedicated_turns_hosts; } | tr '\n' ' '
     fi
 }
 

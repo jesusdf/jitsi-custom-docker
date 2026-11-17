@@ -106,12 +106,30 @@ generate_trusted_hosts() {
 # -----------------------------------------------------------------------------
 
 generate_stream_config() {
+    turns_hosts=$(dedicated_turns_hosts)
+
+    if [ -n "$turns_hosts" ]; then
+        log "TURN over TLS on: $(printf '%s\n' "$turns_hosts" | tr '\n' ' ')"
+    else
+        warn "TURNS_HOST names no host of its own: browsers cannot reach TURN over TLS on 443/tcp"
+    fi
+
+    # One case-insensitive rule per name, dots escaped for the regex.
+    sni_rules=$(printf '%s\n' "$turns_hosts" | sed -e '/^$/d' -e 's/\./\\./g' \
+        -e "s/.*/    ~*^&\$  \"127.0.0.1:$TURN_BACKEND_PORT\";/")
+
     cat > "$GENERATED/stream/443.conf" <<EOF
-# TURN clients announce the ALPN "stun.turn"; browsers announce h2 or
-# http/1.1. Anything unrecognised is treated as HTTPS.
-map \$ssl_preread_alpn_protocols \$jitsi_443_backend {
+# Browsers send no ALPN on a turns: connection, so they are recognised by the
+# name they ask for: the TURNS_HOST names that serve no website. Other TURN
+# clients may announce the ALPN "stun.turn" instead. Everything else is HTTPS.
+map \$ssl_preread_alpn_protocols \$jitsi_443_by_alpn {
     ~\\bstun\\.turn\\b  "127.0.0.1:$TURN_BACKEND_PORT";
     default            "127.0.0.1:$HTTPS_BACKEND_PORT";
+}
+
+map \$ssl_preread_server_name \$jitsi_443_backend {
+$sni_rules
+    default  \$jitsi_443_by_alpn;
 }
 
 server {

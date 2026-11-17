@@ -51,7 +51,9 @@ scripts/gen-secrets.sh    fills the empty secrets in .env
 conf/
   routes.conf             sub-paths proxied elsewhere, per domain
   certs/                  certificates, private keys, extra CA
-  branding/               logo, background, dynamic branding JSON
+  branding/               logo, background, dynamic branding JSON, and the
+                          operator's custom-config.js and
+                          custom-interface_config.js
   nginx/
     nginx.conf            static: the 443 split and the include layout
     snippets/             included by site files
@@ -63,6 +65,7 @@ conf/
     plugins/              downloaded on startup
     plugin-conf/          templates for plugin configuration
   coturn/                 TURN server template
+  web/                    the stack's own options for the web client
   scripts/                startup scripts
 docs/
   design.md               architecture and the decisions behind it
@@ -88,11 +91,11 @@ flowchart LR
 
     subgraph nginx ["nginx"]
         p80["port 80<br/>ACME challenge<br/>301 to HTTPS"]
-        split{"port 443<br/>ssl_preread<br/>split by ALPN"}
+        split{"port 443<br/>ssl_preread<br/>split by SNI"}
         https["port 8443<br/>HTTPS listener<br/>PROXY protocol"]
     end
 
-    split -- "ALPN = stun.turn" --> turns["coturn:5349<br/>TURN over TLS"]
+    split -- "SNI = TURNS_HOST" --> turns["coturn:5349<br/>TURN over TLS"]
     split -- "anything else" --> https
 
     https --> web["web:80<br/>frontend and signalling"]
@@ -107,7 +110,7 @@ the video bridge inside the stack, never the client.
 | Port | Protocol | Container | Carries |
 |---|---|---|---|
 | 80 | TCP | nginx | ACME challenges; everything else redirects to HTTPS |
-| 443 | TCP | nginx | HTTPS *and* TURN over TLS, separated by ALPN |
+| 443 | TCP | nginx | HTTPS *and* TURN over TLS, separated by SNI |
 | 443 | UDP | coturn | STUN, and TURN over UDP |
 | 10000 | UDP | jvb | Direct media, used whenever the client's network allows it |
 | 20000-20050 | UDP | jigasi | SIP media. Only when the `jigasi` profile is on |

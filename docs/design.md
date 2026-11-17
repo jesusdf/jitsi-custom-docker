@@ -50,9 +50,10 @@ exact tag, because there the whole point is to choose the release.
 
 HTTPS and TURN over TLS both want the one port a restrictive firewall is likely
 to allow. nginx runs its `stream` and `http` blocks at once and tells the two
-protocols apart by the ALPN of each connection:
+protocols apart by the name each TLS connection asks for:
 
 ```
+                        SNI = TURNS_HOST ──→ 127.0.0.1:8444 ──→ coturn:5349
                         ALPN "stun.turn" ──→ 127.0.0.1:8444 ──→ coturn:5349
 :443/tcp ──→ stream ────┤
              ssl_preread  anything else  ──→ 127.0.0.1:8443 (HTTPS)
@@ -61,12 +62,32 @@ protocols apart by the ALPN of each connection:
 :10000/udp ────────────────────────────────→ jvb
 ```
 
-This is the arrangement the official `jitsi-meet-turnserver` package uses.
+**Why a name, not the ALPN.** Browsers send no ALPN on a `turns:` connection,
+so a rule that waits for `stun.turn` never sees them; it is kept only for
+clients that do send it. The official `jitsi-meet` configuration turns the rule
+around -- `h2` and `http/1.x` to the web, everything else to coturn -- and now
+calls ALPN multiplexing deprecated. Here that would also send to coturn any
+HTTPS client that omits ALPN, on every vhost the proxy serves. A dedicated name
+moves nothing that already works.
+
+`TURNS_HOST` therefore has to be a name of its own. One that is also in
+`JITSI_DOMAINS` would take that domain's HTTPS with it, so nginx ignores it,
+logs a warning, and TURN over TLS is left to the ALPN rule.
+
+**TURN over UDP needs telling twice.** Prosody advertises `turn:` with
+`TURN_TRANSPORT=udp`; plain TCP on 443 would land on the HTTPS server. And
+lib-jitsi-meet only offers the bridge connection TURN servers with
+`transport=tcp` unless `config.useTurnUdp` is set, which
+`conf/web/custom-config.js` does.
 
 **The relay port range is not published.** In TURN the client only ever talks
 to the server on its listening port. The `min-port`/`max-port` range faces the
 *peer* -- here the video bridge, on the stack's own network -- so that traffic
-never leaves the host and needs no firewall rule.
+never leaves the host and needs no firewall rule. For the same reason coturn
+hands out its internal address as the relay address and `external-ip` stays
+unset: the public address with an unpublished port is reachable by nobody,
+while the internal one serves the bridge and any other client relayed by the
+same coturn.
 
 ### 2.3 Preserving the client address
 
@@ -453,7 +474,7 @@ Overwriting files inside the image is avoided. In order of preference:
 |---|---|
 | `DYNAMIC_BRANDING_URL`, served from `conf/branding/` | Logo, premeeting background, colours, theme. Can differ per domain. |
 | `custom-interface_config.js`, appended by the image | Application name, provider name, watermarks, links |
-| `custom-config.js`, appended by the image | Options with no environment variable |
+| `custom-config.js`, appended by the image | Options with no environment variable. `init` builds it from `conf/web/` and `conf/branding/` |
 | `/config/nginx-custom/*.conf` | Serving your own assets |
 
 **No official mechanism:** `favicon.ico`, `apple-touch-icon.png`, the PWA icons
