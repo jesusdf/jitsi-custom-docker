@@ -351,12 +351,14 @@ write_route() {
     printf '    location ~* %s {\n' "$path"
     printf '        set $route_target "%s";\n' "$target"
     printf '        proxy_pass $route_target;\n'
-    printf '        include /etc/nginx/proxy-defaults.conf;\n'
+    printf '        include /etc/nginx/proxy-forwarded.conf;\n'
     printf '        proxy_ssl_server_name on;\n'
 
-    # An upstream that serves several tenants needs the name it knows itself
-    # by, not the name the browser asked for.
-    [ -n "$host_override" ] && printf '        proxy_set_header Host %s;\n' "$host_override"
+    # A route leaves this deployment, so it does not forward the name the
+    # browser asked for: an upstream that serves several sites -- an Azure App
+    # Service, say -- knows itself only by its own name and answers any other
+    # with a 404. The original name still travels in X-Forwarded-Host.
+    printf '        proxy_set_header Host %s;\n' "${host_override:-\$proxy_host}"
 
     index=0
     for url in $mirror_urls; do
@@ -372,8 +374,9 @@ write_route() {
         printf '        internal;\n'
         printf '        set $mirror_target "%s";\n' "$url"
         printf '        proxy_pass $mirror_target$request_uri;\n'
-        printf '        include /etc/nginx/proxy-defaults.conf;\n'
+        printf '        include /etc/nginx/proxy-forwarded.conf;\n'
         printf '        proxy_ssl_server_name on;\n'
+        printf '        proxy_set_header Host $proxy_host;\n'
         printf '    }\n\n'
     done
 }

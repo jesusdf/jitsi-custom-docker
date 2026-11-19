@@ -315,6 +315,15 @@ which is why the generated server blocks send permissive CORS headers.
 a copy of the request and its response is discarded, which is how one
 deployment fans a notification out to several backends.
 
+A route sends the target's own name as `Host` and the browser's in
+`X-Forwarded-Host`. The targets are other services, often on shared hosting
+that picks the site by `Host` and answers a name it does not know with a 404;
+forwarding the public name, as a drop-in vhost does, would break exactly those.
+`host=` overrides the default, `host=$host` included. Routes therefore include
+`proxy-forwarded.conf`, which is `proxy-defaults.conf` without `Host`: nginx
+sends every `proxy_set_header` it is given, so overriding `Host` beside the
+full snippet would put two of them on the wire.
+
 ### Hosts nobody serves
 
 A request by IP address, or with an SNI that matches no vhost, would land on
@@ -334,7 +343,8 @@ included verbatim.
 
 To keep files written for a host nginx working, the stack publishes the usual
 snippets at the usual paths: `/etc/nginx/site-defaults.conf`,
-`proxy-defaults.conf`, `only-trusted-hosts.conf` and `no-robots.conf`.
+`proxy-defaults.conf`, `proxy-forwarded.conf`, `only-trusted-hosts.conf` and
+`no-robots.conf`.
 `site-defaults.conf` carries the `listen` directive, so a drop-in file never
 has to know which internal port the splitter forwards to.
 

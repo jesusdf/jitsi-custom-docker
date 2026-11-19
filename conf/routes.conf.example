@@ -14,8 +14,12 @@
 #   mirror=<url>,<url>   each URL receives a copy of the request and its
 #                        response is discarded, which is how one request fans
 #                        out to several backends
-#   host=<name>          override the Host header, for an upstream that serves
-#                        several tenants and needs the name it knows itself by
+#   host=<name>          the Host header to send. By default it is the
+#                        target's own name, which is what an upstream serving
+#                        several sites expects; host=$host forwards the name
+#                        the browser asked for instead. Mirrors always get
+#                        their own name. The original name travels in
+#                        X-Forwarded-Host either way.
 #
 # Order matters: the first matching rule wins, as with any nginx location.
 # Copy to routes.conf and edit.
@@ -25,7 +29,7 @@
 meet.example.org        ^/apps/waiting-room/    https://app.example.org
 meet.example.org        ^/rest/                 https://app.example.org
 meet.example.org        ^/notify/               https://events.example.org  mirror=https://backup-a.example.org,https://backup-b.example.org
-meet.example.org        ^/translate/            https://api.vendor.example   host=api.vendor.example
+meet.example.org        ^/translate/            https://api.vendor.example   host=$host
 meet.example.org        ^/legacy-close\.html$   redirect:302:/static/close2.html
 
 team.meet.example.org   ^/apps/waiting-room/    https://team.example.org

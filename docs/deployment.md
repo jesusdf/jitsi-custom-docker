@@ -200,7 +200,13 @@ Two options are available:
 | Option | Effect |
 |---|---|
 | `mirror=<url>,<url>` | Each URL receives a copy of the request; responses are discarded |
-| `host=<name>` | Overrides the `Host` header, for an upstream that serves several tenants |
+| `host=<name>` | The `Host` header to send; defaults to the target's own name |
+
+A route sends the target's own name as `Host`, not the one the browser asked
+for. An upstream that serves several sites -- an Azure App Service, for one --
+only knows itself by its own name and answers anything else with a 404. The
+original name still reaches it in `X-Forwarded-Host`. Use `host=$host` for a
+backend that wants the public name instead. Mirrors always get their own name.
 
 To reach a service running on the Docker host rather than in the stack, use
 `host.docker.internal` as the hostname.
@@ -215,8 +221,8 @@ meet.example.org   ^/rest/                https://app.example.org
 # Notifications go to one backend and are copied to two others
 meet.example.org   ^/notify/              https://events.example.org  mirror=https://a.example.org,https://b.example.org
 
-# A third-party API that needs its own Host header
-meet.example.org   ^/translate/           https://api.vendor.example  host=api.vendor.example
+# A backend that wants the name the browser asked for
+meet.example.org   ^/translate/           https://api.vendor.example  host=$host
 
 # A retired page
 meet.example.org   ^/old-close\.html$     redirect:302:/static/close2.html
@@ -463,12 +469,18 @@ The snippets a host nginx usually provides are published at the same paths, so
 ```nginx
 include /etc/nginx/site-defaults.conf;      # TLS settings and the listen directive
 include /etc/nginx/proxy-defaults.conf;     # the usual proxy headers
+include /etc/nginx/proxy-forwarded.conf;    # the same, minus Host
 include /etc/nginx/only-trusted-hosts.conf; # your IP allow-list
 include /etc/nginx/no-robots.conf;          # robots.txt
 ```
 
 `site-defaults.conf` carries the `listen` directive, so your file never needs
 to know which internal port the 443 splitter forwards to.
+
+To send a different `Host`, include `proxy-forwarded.conf` and set the header
+yourself. Adding a second `proxy_set_header Host` next to
+`proxy-defaults.conf` does not replace the first: nginx sends both, and most
+servers refuse the request with a 400.
 
 To add a snippet of your own, drop it in `conf/nginx/snippets/`; it is
 published at `/etc/nginx/<name>.conf` too.
@@ -876,7 +888,9 @@ docker compose logs prosody | grep -i notification
 
 A TLS error means the endpoint's CA is not trusted: set `EXTRA_CA_FILE`
 (section 3.6). A 404 or 502 means nginx is not routing the path -- check the
-matching rule in `conf/routes.conf`.
+matching rule in `conf/routes.conf`. A 404 that comes back as the upstream
+platform's own "site not found" page means the path is routed but the upstream
+does not recognise the `Host` header: check the rule's `host=` option.
 
 ### An IP allow-list blocks everyone
 
