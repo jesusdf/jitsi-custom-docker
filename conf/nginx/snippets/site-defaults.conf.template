@@ -41,3 +41,7 @@ index index.html index.htm;
 location ~ /\.ht {
     deny all;
 }
+
+location ~ /\.env {
+    deny all;
+}
